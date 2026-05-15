@@ -1,0 +1,303 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 14: Multiple Testing & FDR — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html" class="active">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 14 / 17</div>
+<h1 data-zh="多重檢定與 FDR (BH / Storey q / IHW)" data-en="Multiple Testing & FDR (BH / Storey q / IHW)">多重檢定與 FDR</h1>
+<p class="subtitle" data-lang="zh">當你同時跑 20,000 個基因檢定，0.05 早就不是「5% 假陽性」——本章建立 FWER 與 FDR 的差別，並把 BH、Storey q-value、IHW 整合進 RNA-seq / GWAS / 蛋白質體標準流程。</p>
+<p class="subtitle" data-lang="en">Run 20,000 gene-level tests and α=0.05 no longer means "5% false positives". This chapter contrasts FWER vs FDR and integrates BH, Storey's q-value, and IHW into the standard RNA-seq / GWAS / proteomics pipeline.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== OVERVIEW ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼基因組規模的篩查必須校正？" data-en="Why genome-wide screens must adjust">為什麼基因組規模的篩查必須校正？</h2>
+<div data-lang="zh">
+<p>假設你檢定 m = 20,000 個基因，全部在虛無假設下，仍會期待 m·α = 1,000 個 p &lt; 0.05 的「顯著」結果。<strong>不校正的 p-value 在多重檢定下沒有意義。</strong>校正方法分兩條路：(1) <strong>FWER</strong>（Family-Wise Error Rate）控制「<em>至少一個</em>」假陽性的機率——非常嚴格，適合驗證型研究；(2) <strong>FDR</strong>（False Discovery Rate）控制「<em>被宣告為顯著之中</em>的假陽性<em>比例</em>」——更貼近發現型研究的需求。</p>
+<p>本章介紹三個現代 FDR 標準：(a) Benjamini-Hochberg (BH) 程序——簡單、無分布假設、PRDS 相依下仍然有效；(b) Storey 的 pFDR / q-value——估計 π₀（真的虛無比例），比 BH 更有檢力；(c) Independent Hypothesis Weighting (IHW)——利用「均值表現量」等共變數，把檢力分配給更有信號的子集，仍保有 FDR 控制。</p>
+</div>
+<div data-lang="en">
+<p>If you test m = 20,000 genes all under the null, you expect m·α = 1,000 "significant" results at p &lt; 0.05. <strong>Unadjusted p-values are meaningless at genome scale.</strong> Two correction families exist: (1) <strong>FWER</strong> (Family-Wise Error Rate) controls the probability of <em>any</em> false positive — strict, suits confirmatory work; (2) <strong>FDR</strong> (False Discovery Rate) controls the <em>proportion</em> of false positives <em>among rejections</em> — better suited to discovery.</p>
+<p>This chapter introduces three modern FDR standards: (a) Benjamini-Hochberg (BH) — simple, distribution-free, valid under PRDS dependence; (b) Storey's pFDR / q-value — estimates π₀ (true-null fraction), more powerful than BH; (c) Independent Hypothesis Weighting (IHW) — uses a covariate (e.g. mean expression) to redirect power toward signal-rich subsets while preserving FDR control.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>FWER 答「我能否信任<em>任何一個</em>結果」；FDR 答「我可以容忍清單中 5% 是假的」。基因組研究幾乎一律選 FDR——因為「至少一個假陽性」在 20,000 個檢定下幾乎必然發生，卻不影響整體推論。</span>
+<span data-lang="en"><strong>Core principle:</strong> FWER answers "can I trust <em>any</em> single result"; FDR answers "I'm willing to accept 5% of my hits being false". Genome-wide work almost universally chooses FDR — "at least one false positive" is nearly inevitable across 20,000 tests yet does not invalidate the overall list.</span>
+</div></div>
+</section>
+
+<!-- ===== CORE CONCEPTS ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、FWER vs FDR、BH 程序與相依性" data-en="I. FWER vs FDR, the BH Procedure & Dependence">一、FWER vs FDR 與 BH 程序</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">🛡️</div><h4 data-zh="FWER：Bonferroni / Holm" data-en="FWER: Bonferroni / Holm">FWER：Bonferroni / Holm</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Bonferroni</strong>：在 α/m 下拒絕——最簡單但最保守。</li>
+<li><strong>Holm</strong>：步降程序——比 Bonferroni 嚴格更有檢力，仍控 FWER。</li>
+<li>適用情境：驗證型研究、安全性報告、臨床終點。</li>
+<li>代價：在 m=20,000 時幾乎無檢力，會錯失真實效應。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Bonferroni</strong>: reject at α/m — simplest but most conservative.</li>
+<li><strong>Holm</strong>: step-down — strictly more powerful than Bonferroni, still FWER-valid.</li>
+<li>Best for: confirmatory work, safety endpoints, clinical primary outcomes.</li>
+<li>Cost: at m=20,000 power collapses; real effects get missed.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">📊</div><h4 data-zh="FDR：BH / BY / Storey q" data-en="FDR: BH / BY / Storey q">FDR：BH / BY / Storey q</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>BH (1995)</strong>：排序 p-value，找最大的 i 使 p₍ᵢ₎ ≤ i·q/m，拒絕前 i 個。</li>
+<li><strong>BY (2001)</strong>：對任意相依有效——乘以調和級數，較保守。</li>
+<li><strong>Storey q</strong>：估計 π₀ 後得 q-value——通常比 BH 多 10–30% 發現。</li>
+<li><strong>local FDR (lfdr)</strong>：每個特徵的「來自虛無」後驗機率。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>BH (1995)</strong>: sort p-values; find largest i with p₍ᵢ₎ ≤ i·q/m; reject top i.</li>
+<li><strong>BY (2001)</strong>: valid under arbitrary dependence (× harmonic factor) — conservative.</li>
+<li><strong>Storey q</strong>: estimates π₀ → q-value; typically 10–30% more discoveries than BH.</li>
+<li><strong>local FDR (lfdr)</strong>: per-feature posterior probability of being null.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">⚖️</div><h4 data-zh="IHW：共變數加權" data-en="IHW: Covariate Weighting">IHW：共變數加權</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>用<strong>獨立共變數</strong>（如基因平均表現量）對檢定加權。</li>
+<li>有資料的子集 → 更多 α 預算；低表現子集 → 較少預算。</li>
+<li>共變數需與 p-value 在 H₀ 下獨立——否則破壞 FDR 控制。</li>
+<li>DESeq2 預設用 IHW 替代 BH。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Weights tests by an <strong>independent covariate</strong> (e.g. mean expression).</li>
+<li>Signal-rich strata get more α budget; low-expression strata less.</li>
+<li>Covariate must be independent of p-value under H₀ — else FDR breaks.</li>
+<li>DESeq2 ships with IHW as a drop-in replacement for BH.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🔗</div><h4 data-zh="相依性與 BH 的有效性" data-en="Dependence & BH Validity">相依性與 BH 的有效性</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>PRDS</strong>（正相依）下 BH 仍有效——大多數基因表現、GWAS LD 屬此類。</li>
+<li>任意相依 → 用 BY，或<strong>permutation-based FDR</strong>。</li>
+<li>強相關（基因網絡、長 LD 區塊）會讓 BH 略保守，但不會失效。</li>
+<li>對極端相依結構，permutation 是黃金標準。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Under <strong>PRDS</strong> (positive dependence) BH remains valid — covers most expression / GWAS LD.</li>
+<li>Arbitrary dependence → use BY or <strong>permutation-based FDR</strong>.</li>
+<li>Strong correlation (networks, long LD blocks) makes BH slightly conservative, not invalid.</li>
+<li>For extreme dependence, permutation is the gold standard.</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>q-value ≠ p-value：</strong>q = 0.05 不代表「5% Type I 錯誤率」，而是「若我把這個基因列入，整批發現中假陽性的<em>期望比例</em>是 5%」。把 q-value 當 p-value 報告會誤導讀者。</div>
+<div data-lang="en"><strong>q-value is NOT a p-value:</strong> q = 0.05 does NOT mean a 5% Type I error rate. It means "if I include this gene, the expected proportion of false positives <em>among rejections</em> is 5%". Reporting q-values as if they were p-values is misleading.</div>
+</div></div>
+
+<h2 data-zh="二、過濾、p-value 直方圖與生信流程" data-en="II. Filtering, p-value Histograms & Bioinfo Pipelines">二、過濾、診斷與生信流程整合</h2>
+
+<div data-lang="zh">
+<p><strong>p-value 直方圖</strong>是 FDR 最重要的診斷：H₀ 下 p-value 應為 <code>Uniform(0,1)</code>，所以直方圖應該平坦——加上 0 附近的尖峰（真實訊號）。如果出現「中段凸起」或「右側上升」，表示你的<strong>檢定本身偏離 H₀ 分布</strong>（批次效應、隱性共變數、模型錯置），這時做任何 FDR 校正都無效——必須先修檢定。</p>
+<p><strong>獨立過濾（independent filtering）</strong>：在做 FDR 前，移除<em>與 p-value 在 H₀ 下獨立</em>的低訊號特徵（如極低 count 的基因）——這會增加檢力但不破壞 FDR。但若<em>過濾準則基於檢定統計量本身</em>（如先取 |LFC| &gt; 1 才做 FDR），則 FDR 失效。IHW 把過濾的精神原則化：用共變數加權，理論完備。</p>
+<p><strong>生信標準流程：</strong>RNA-seq DE 用 BH 或 IHW（DESeq2 預設）；GWAS 用 5×10⁻⁸ 的 Bonferroni 門檻；MS 蛋白質體（FragPipe / MaxQuant）用 target-decoy FDR；ChIP-seq peak calling 用 MACS2 的 q-value；single-cell DE 用每組獨立的 BH。</p>
+</div>
+<div data-lang="en">
+<p><strong>The p-value histogram</strong> is the single most important FDR diagnostic: under H₀ p is <code>Uniform(0,1)</code>, so the histogram should be flat with a spike near 0 (real signal). A bump in the middle or rising right tail means your <strong>test itself deviates from its null distribution</strong> (batch effects, hidden covariates, misspecified model) — no amount of FDR correction can fix this; fix the test first.</p>
+<p><strong>Independent filtering</strong>: remove low-signal features whose distribution is <em>independent of the p-value under H₀</em> (e.g. very-low-count genes) before applying FDR — this boosts power without invalidating FDR. But filtering on the <em>test statistic itself</em> (e.g. first keeping |LFC| &gt; 1 and then computing FDR) breaks FDR. IHW formalises filtering into principled covariate weighting.</p>
+<p><strong>Standard bioinfo pipelines:</strong> RNA-seq DE uses BH or IHW (DESeq2 default); GWAS uses the 5×10⁻⁸ Bonferroni threshold; MS proteomics (FragPipe / MaxQuant) uses target-decoy FDR; ChIP-seq peak calling uses MACS2 q-values; single-cell DE applies BH within each cluster.</p>
+</div>
+</section>
+
+<!-- ===== INTERACTIVE ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="BH 程序視覺化：q-threshold 與 π₀ 對發現數的影響" data-en="BH Procedure: How q-threshold and π₀ Drive Discoveries">BH 程序視覺化</h2>
+<div data-lang="zh"><p>下方散布圖中，每點是一個基因的 p-value 與排序 i 的對應位置。<strong>紅線</strong>是 <code>i·q/m</code>——BH 接受所有<em>低於</em>此線的點。拖動滑桿觀察：q 增加，紅線陡升，更多點被接受；π₀ 降低（更多基因是真實訊號），p-value 集中在左下角，BH 與 Storey 的差距變大。</p></div>
+<div data-lang="en"><p>Each dot is a gene at rank i with its p-value. The <strong>red line</strong> is <code>i·q/m</code> — BH rejects every dot <em>below</em> it. Slide q upward and the threshold rises; lower π₀ (more truly-non-null genes) packs p-values into the lower-left, widening the gap between BH and Storey.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats">
+  <span class="sim-stat pass" id="statBH">BH —</span>
+  <span class="sim-stat pass" id="statStorey">Storey —</span>
+  <span class="sim-stat fail" id="statBon">Bonferroni —</span>
+</div>
+<div class="slider-group"><label><span data-zh="q 門檻" data-en="q-threshold">q 門檻</span> <span id="valQ">0.05</span></label><input type="range" id="sliderQ" min="1" max="30" value="5" step="1"></div>
+<div class="slider-group"><label><span data-zh="π₀ (真實虛無比例)" data-en="π₀ (true-null fraction)">π₀</span> <span id="valPi">0.80</span></label><input type="range" id="sliderPi" min="30" max="99" value="80" step="1"></div>
+<div class="slider-group"><label><span data-zh="基因總數 m" data-en="Number of tests m">m</span> <span id="valM">2000</span></label><input type="range" id="sliderM" min="500" max="10000" value="2000" step="500"></div>
+<div class="chart-container"><canvas id="fdrChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;">X: <span data-zh="排序 i" data-en="rank i">排序 i</span> | Y: p-value | <span data-zh="紅線：BH 閾值 i·q/m" data-en="Red line: BH threshold i·q/m">紅線：BH 閾值 i·q/m</span></p>
+</div>
+</section>
+
+<!-- ===== CODE ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：BH / Storey / IHW 與直方圖診斷" data-en="Code: BH / Storey / IHW & Histogram Diagnostics">實作：BH / Storey / IHW</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- 多重檢定校正</span>
+<span class="comment"># p 是長度 m 的 p-value 向量；res 是 DESeq2 結果</span>
+
+<span class="comment"># 1) 基本 BH / Holm / Bonferroni</span>
+padj_bh   &lt;- <span class="func">p.adjust</span>(p, method=<span class="str">"BH"</span>)      <span class="comment"># FDR</span>
+padj_holm &lt;- <span class="func">p.adjust</span>(p, method=<span class="str">"holm"</span>)    <span class="comment"># FWER</span>
+padj_bon  &lt;- <span class="func">p.adjust</span>(p, method=<span class="str">"bonferroni"</span>)
+<span class="func">sum</span>(padj_bh &lt; <span class="num">0.05</span>)                          <span class="comment"># 發現數</span>
+
+<span class="comment"># 2) Storey q-value（更高檢力）</span>
+<span class="func">library</span>(qvalue)
+qv &lt;- <span class="func">qvalue</span>(p)
+qv$pi0                                          <span class="comment"># 估計的真實虛無比例</span>
+<span class="func">sum</span>(qv$qvalues &lt; <span class="num">0.05</span>)
+
+<span class="comment"># 3) IHW —— 用共變數加權 (DESeq2 預設)</span>
+<span class="func">library</span>(IHW); <span class="func">library</span>(DESeq2)
+ihw_res &lt;- <span class="func">ihw</span>(pvalue ~ baseMean, data=res, alpha=<span class="num">0.05</span>)
+<span class="func">rejections</span>(ihw_res)
+<span class="func">plot</span>(ihw_res)                                  <span class="comment"># 看各組權重分布</span>
+
+<span class="comment"># 4) p-value 直方圖診斷（最重要的 sanity check）</span>
+<span class="func">hist</span>(p, breaks=<span class="num">50</span>, main=<span class="str">"p-value histogram"</span>)
+<span class="comment"># 理想：左側尖峰 + 右側平坦; 中段凸起 = 模型有問題</span></pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np, matplotlib.pyplot <span class="kw">as</span> plt
+<span class="kw">from</span> statsmodels.stats.multitest <span class="kw">import</span> multipletests
+
+<span class="comment"># 1) BH / Holm / Bonferroni</span>
+rej, padj, _, _ = multipletests(p, alpha=<span class="num">0.05</span>, method=<span class="str">"fdr_bh"</span>)
+np.sum(rej)
+_, padj_holm, _, _ = multipletests(p, method=<span class="str">"holm"</span>)
+
+<span class="comment"># 2) Storey π₀ 估計（簡易版）</span>
+<span class="kw">def</span> <span class="func">pi0_storey</span>(p, lam=<span class="num">0.5</span>):
+    <span class="kw">return</span> np.mean(p &gt; lam) / (<span class="num">1</span> - lam)
+pi0 = pi0_storey(p)
+
+<span class="comment"># 3) IHW 透過 rpy2 橋接 R（沒有原生 Python 版）</span>
+<span class="kw">from</span> rpy2.robjects <span class="kw">import</span> r, FloatVector
+r.assign(<span class="str">"p"</span>, FloatVector(p)); r.assign(<span class="str">"bm"</span>, FloatVector(base_mean))
+r(<span class="str">'library(IHW); ihw_res &lt;- ihw(p, bm, alpha=0.05)'</span>)
+
+<span class="comment"># 4) p-value 直方圖診斷</span>
+plt.hist(p, bins=<span class="num">50</span>); plt.xlabel(<span class="str">"p-value"</span>); plt.show()
+<span class="comment"># 平坦 + 左側尖峰 → 模型 OK</span></pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>(1) 先用 |LFC| &gt; 1 過濾再做 BH —— 破壞 FDR。(2) 在 p-value 直方圖右側上升時直接報 BH —— 你校正的是錯的 p-value。(3) 把 q-value 標成「Type I 錯誤率 5%」—— 概念錯置。(4) 對 GWAS 跨整個基因組做 BH 卻忽視 LD —— 應該先做 LD-aware clumping。</span>
+<span data-lang="en"><strong>Common mistakes:</strong> (1) Filtering by |LFC| &gt; 1 then applying BH — breaks FDR. (2) Running BH on p-values whose histogram rises on the right — you're correcting the wrong null. (3) Labelling q-values as "Type I error rate 5%" — wrong concept. (4) Applying BH genome-wide for GWAS while ignoring LD — do LD-aware clumping first.</span>
+</div></div>
+</section>
+
+<!-- ===== QUIZ ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 對基因組規模篩查（m = 20,000），為什麼 FDR 通常比 FWER 更合理？</p>
+<p data-lang="en">1. For a genome-wide screen (m = 20,000), why is FDR generally preferred over FWER?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. FDR 在數學上比 FWER 嚴格</span><span data-lang="en">A. FDR is mathematically stricter than FWER</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. FWER 不適用於連續資料</span><span data-lang="en">B. FWER does not apply to continuous data</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. FWER 在 20,000 檢定下會犧牲幾乎所有檢力；FDR 容忍少量假陽性換取大量真陽性發現</span><span data-lang="en">C. FWER sacrifices nearly all power across 20,000 tests; FDR trades a few false positives for many true discoveries</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. FDR 不需要校正</span><span data-lang="en">D. FDR requires no correction</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 「這個基因的 q-value = 0.05」最精確的解讀是？</p>
+<p data-lang="en">2. The most precise interpretation of "this gene's q-value = 0.05" is:</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 此基因為假陽性的機率為 5%</span><span data-lang="en">A. The probability that this gene is a false positive is 5%</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 在 H₀ 下看到此 p-value 或更極端的機率為 5%</span><span data-lang="en">B. Probability of seeing this p-value or more extreme under H₀ is 5%</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 若把此基因納入發現清單，整批發現中假陽性的期望比例為 5%</span><span data-lang="en">C. If this gene is included in the discovery list, the expected proportion of false positives among rejections is 5%</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 5% 的 Type I 錯誤率</span><span data-lang="en">D. A 5% Type I error rate</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. BH 程序在何種相依性下嚴格有效？</p>
+<p data-lang="en">3. Under what dependence is the BH procedure strictly valid?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 僅在完全獨立時</span><span data-lang="en">A. Only under complete independence</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 在獨立或 PRDS（正相依）下</span><span data-lang="en">B. Under independence or PRDS (positive dependence)</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 在任意相依下都嚴格有效</span><span data-lang="en">C. Strictly valid under arbitrary dependence</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 僅在 p-value 為常態時</span><span data-lang="en">D. Only when p-values are normally distributed</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="empirical-bayes-limma.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 13: Empirical Bayes / limma</span></a>
+<a href="de-statistics.html" style="text-align:right"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 15: DE Statistics</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// ---- BH visualisation ----
+function rbeta_like(a,b){let x=0;for(let i=0;i<12;i++)x+=Math.random();const z=(x-6);const u=1/(1+Math.exp(-z));return u;}
+function simulatePvalues(m,pi0){
+  const n0=Math.round(m*pi0), n1=m-n0; const ps=[];
+  for(let i=0;i<n0;i++) ps.push(Math.random());
+  for(let i=0;i<n1;i++){let p=Math.pow(Math.random(),6);ps.push(Math.max(1e-10,Math.min(0.999,p)));}
+  return ps.sort((a,b)=>a-b);
+}
+
+const fdrChart=new Chart(document.getElementById('fdrChart'),{type:'scatter',data:{datasets:[
+  {label:'Rejected (BH)',data:[],backgroundColor:'rgba(192,57,43,0.7)',pointRadius:2.5},
+  {label:'Accepted',data:[],backgroundColor:'rgba(120,120,120,0.35)',pointRadius:1.6},
+  {label:'BH threshold i·q/m',data:[],type:'line',borderColor:'rgba(192,57,43,0.95)',borderWidth:2,pointRadius:0,fill:false,tension:0}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'rank i'}},y:{title:{display:true,text:'p-value'},min:0,max:1}}}});
+
+let cached={m:0,pi:0,p:[]};
+function updateFDR(){
+  const q=(+document.getElementById('sliderQ').value)/100;
+  const pi=(+document.getElementById('sliderPi').value)/100;
+  const m=+document.getElementById('sliderM').value;
+  document.getElementById('valQ').textContent=q.toFixed(2);
+  document.getElementById('valPi').textContent=pi.toFixed(2);
+  document.getElementById('valM').textContent=m;
+  if(cached.m!==m||Math.abs(cached.pi-pi)>1e-6){cached={m,pi,p:simulatePvalues(m,pi)};}
+  const ps=cached.p;
+  // BH threshold
+  let kBH=0; for(let i=ps.length-1;i>=0;i--){if(ps[i]<=(i+1)*q/ps.length){kBH=i+1;break;}}
+  // Bonferroni
+  let kBon=0; for(let i=0;i<ps.length;i++) if(ps[i]<q/ps.length) kBon++;
+  // Storey (simple): pi0 estimate, then BH using m*pi0
+  const pi0_hat=Math.max(0.05,Math.min(1,pi));
+  let kSt=0; const mEff=ps.length*pi0_hat;
+  for(let i=ps.length-1;i>=0;i--){if(ps[i]<=(i+1)*q/mEff){kSt=i+1;break;}}
+  // Build scatter — downsample for performance
+  const step=Math.max(1,Math.round(ps.length/600));
+  const rej=[],acc=[],line=[];
+  for(let i=0;i<ps.length;i+=step){const x=i+1,y=ps[i];(i<kBH?rej:acc).push({x,y});}
+  for(let i=1;i<=ps.length;i+=Math.max(1,Math.round(ps.length/40))) line.push({x:i,y:i*q/ps.length});
+  line.push({x:ps.length,y:q});
+  fdrChart.data.datasets[0].data=rej;
+  fdrChart.data.datasets[1].data=acc;
+  fdrChart.data.datasets[2].data=line;
+  fdrChart.options.scales.y.max=Math.min(1,Math.max(0.2,q*4));
+  fdrChart.update('none');
+  document.getElementById('statBH').textContent='BH: '+kBH;
+  document.getElementById('statStorey').textContent='Storey q: '+kSt;
+  document.getElementById('statBon').textContent='Bonferroni: '+kBon;
+}
+['sliderQ','sliderPi','sliderM'].forEach(id=>document.getElementById(id).addEventListener('input',updateFDR));
+document.addEventListener('langchange',updateFDR);
+updateFDR();
+
+// Quiz
+const QF={
+  zh:{q1_y:'FDR 在大規模檢定下保持實用檢力；FWER 在 m=20,000 幾乎拒絕所有發現。',q1_n:'正確答案已標示。',q2_y:'q-value 是「整批發現中假陽性比例」的期望——而非單一檢定的錯誤率。',q2_n:'正確答案已標示。',q3_y:'BH 在獨立或 PRDS（正相依）下有效；任意相依需 BY 或 permutation。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'FDR preserves practical power at large m; FWER essentially rejects nothing at m=20,000.',q1_n:'Correct answer highlighted.',q2_y:'A q-value bounds the expected false-positive proportion among rejections — not a single-test error rate.',q2_n:'Correct answer highlighted.',q3_y:'BH is valid under independence or PRDS; arbitrary dependence requires BY or permutation FDR.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

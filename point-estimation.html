@@ -1,0 +1,246 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 2: Point Estimation & Sampling Distributions — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html" class="active">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 2 / 17</div>
+<h1 data-zh="點估計與抽樣分布 (Point Estimation & Sampling Distributions)" data-en="Point Estimation & Sampling Distributions">點估計與抽樣分布</h1>
+<p class="subtitle" data-lang="zh">從 MoM 到 MLE，從 Fisher 資訊到 Cramér-Rao 下限——以及為何「有偏卻收縮」的估計在 RNA-seq 上反而勝過 MLE。</p>
+<p class="subtitle" data-lang="en">From MoM to MLE, from Fisher information to the Cramér-Rao lower bound — and why biased shrinkage estimators beat the MLE in RNA-seq MSE.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Overview ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼要分清楚「估計量」與「估計值」？" data-en="Why distinguish estimator vs. estimate?">為什麼要分清楚「估計量」與「估計值」？</h2>
+<div data-lang="zh">
+<p><strong>估計量 (estimator)</strong> 是一個<em>函數</em>──把資料 X 映射到參數空間，例如 X̄ 是 μ 的估計量；<strong>估計值 (estimate)</strong> 是把實際資料代入後得到的<em>數字</em>，例如 x̄ = 4.32。談分布、偏誤、變異數的對象永遠是估計量；談「我這次測得多少」的對象則是估計值。</p>
+<p>本章建立四根支柱：(1) 動差法 (MoM) 與最大概似 (MLE)，(2) MLE 的一致性與漸近常態性，(3) 偏誤-變異數-MSE 分解、Fisher 資訊與 Cramér-Rao 下限 (CRLB)，(4) 為何 DESeq2／edgeR／limma 寧可用<em>有偏</em>的收縮估計，也不要 MLE。</p>
+</div>
+<div data-lang="en">
+<p>An <strong>estimator</strong> is a <em>function</em> mapping data X to the parameter space — e.g. X̄ is an estimator of μ. An <strong>estimate</strong> is the <em>number</em> you get after plugging the actual data in, e.g. x̄ = 4.32. Distributions, bias, and variance are properties of the estimator; "what I measured this time" is the estimate.</p>
+<p>The four pillars: (1) method of moments (MoM) and maximum likelihood (MLE), (2) MLE consistency and asymptotic normality, (3) bias-variance-MSE decomposition, Fisher information and the Cramér-Rao lower bound (CRLB), (4) why DESeq2 / edgeR / limma deliberately choose a <em>biased</em> shrinkage estimator over the MLE.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>「無偏」不等於「最好」。判定優劣的是<strong>均方誤差 MSE = bias² + variance</strong>──稍微的偏誤若能換來大量變異數下降，整體誤差更小。James-Stein 與 limma 的 moderated 統計量正是這個哲學的實現。</span>
+<span data-lang="en"><strong>Core principle:</strong> "Unbiased" is not "best". Quality is judged by <strong>MSE = bias² + variance</strong> — a tiny bias that buys a huge variance reduction wins. James-Stein and limma's moderated statistics are exactly this trade in practice.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、兩大估計法：動差法與最大概似" data-en="I. Two estimators: MoM and MLE">一、兩大估計法：MoM 與 MLE</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">⚖️</div><h4 data-zh="動差法 (MoM)" data-en="Method of Moments (MoM)">動差法 (MoM)</h4>
+<div data-lang="zh"><p>用<em>樣本動差</em>等同<em>理論動差</em>，反解參數。例：NB 平均 μ̂ = x̄，方差 σ̂² = s²，由 σ² = μ + αμ² 解出 α̂。<strong>優點：</strong>不需迭代、計算快、能當 MLE 的起始值。<strong>缺點：</strong>通常變異數較大、對重尾敏感。</p></div>
+<div data-lang="en"><p>Equate <em>sample moments</em> to <em>theoretical moments</em> and invert. e.g. for NB, set μ̂ = x̄, σ̂² = s², solve σ² = μ + αμ² for α̂. <strong>Pros:</strong> closed-form, fast, makes a great MLE warm start. <strong>Cons:</strong> generally higher variance, sensitive to heavy tails.</p></div>
+</div>
+<div class="card"><div class="card-icon">🎯</div><h4 data-zh="最大概似 (MLE)" data-en="Maximum Likelihood (MLE)">最大概似 (MLE)</h4>
+<div data-lang="zh"><p>選擇使資料概似函數 L(θ) = ∏ f(xᵢ; θ) 最大的 θ̂。實作上對 ℓ(θ) = log L(θ) 求極值或解 <code>∂ℓ/∂θ = 0</code> (score equation)。<strong>性質：</strong>一致 (θ̂ →ᵖ θ)、漸近常態 <code>√n(θ̂ − θ) → N(0, I(θ)⁻¹)</code>、漸近有效 (達到 CRLB)。</p></div>
+<div data-lang="en"><p>Choose θ̂ that maximises the likelihood L(θ) = ∏ f(xᵢ; θ). Implementations maximise ℓ(θ) = log L(θ) or solve the score equation <code>∂ℓ/∂θ = 0</code>. <strong>Properties:</strong> consistent (θ̂ →ᵖ θ), asymptotically normal <code>√n(θ̂ − θ) → N(0, I(θ)⁻¹)</code>, asymptotically efficient (attains the CRLB).</p></div>
+</div>
+</div>
+
+<h2 style="margin-top:32px" data-zh="二、Fisher 資訊與 Cramér-Rao 下限" data-en="II. Fisher Information & the Cramér-Rao Lower Bound">二、Fisher 資訊與 CRLB</h2>
+<div data-lang="zh">
+<p><strong>Fisher 資訊</strong> <code>I(θ) = −E[∂²ℓ/∂θ²]</code> 量化每筆觀測對 θ 的「銳利度」。<strong>CRLB：</strong>任何無偏估計量 T 的變異數滿足 <code>Var(T) ≥ 1 / (n·I(θ))</code>。對 Gaussian 均值 (σ² 已知)，<code>I(μ) = 1/σ²</code>，故 <code>Var(X̄) ≥ σ²/n</code>──而 X̄ 剛好達到，所以是<strong>有效估計量 (UMVUE)</strong>。</p>
+<p><strong>偏誤-變異數分解：</strong> <code>MSE(θ̂) = E[(θ̂ − θ)²] = Var(θ̂) + Bias(θ̂)²</code>。CRLB 只規範「無偏」家族；放棄無偏限制後，<em>有偏估計量可低於 CRLB</em>──這就是收縮估計的數學空間。</p>
+</div>
+<div data-lang="en">
+<p><strong>Fisher information</strong> <code>I(θ) = −E[∂²ℓ/∂θ²]</code> measures how sharply each observation pins down θ. <strong>CRLB:</strong> for any unbiased estimator T, <code>Var(T) ≥ 1 / (n·I(θ))</code>. For Gaussian mean (σ² known) <code>I(μ) = 1/σ²</code> so <code>Var(X̄) ≥ σ²/n</code> — and X̄ achieves it, making it the UMVUE.</p>
+<p><strong>Bias-variance decomposition:</strong> <code>MSE(θ̂) = Var(θ̂) + Bias(θ̂)²</code>. CRLB constrains only the <em>unbiased</em> family; allowing bias lets you dip below the CRLB — the mathematical room where shrinkage lives.</p>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>非線性變換下 MLE 有偏：</strong> MLE 對<em>等變變換</em>不變 (e.g. <code>ĉ = g(θ̂)</code>)，但若 g 是非線性 (例如 odds ratio <code>p/(1−p)</code>、log-fold-change 後指數還原)，<em>樣本期望</em>會與 g(θ) 偏離 — 需用 delta method 校正或直接 bootstrap。</div>
+<div data-lang="en"><strong>MLE is biased through nonlinear transforms:</strong> MLE is <em>equivariant</em> under transforms (<code>ĉ = g(θ̂)</code>), but if g is nonlinear (odds ratio <code>p/(1−p)</code>, exponentiating a log-fold-change) the <em>expectation</em> departs from g(θ) — correct via the delta method or bootstrap.</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="抽樣分布模擬器：n 增加時 MLE 怎麼收斂？" data-en="Sampling Distribution Simulator: how the MLE concentrates with n">抽樣分布模擬器</h2>
+<div data-lang="zh"><p>對 N(μ=5, σ=2) 重複抽 <code>B = 500</code> 次樣本，每次計算 <code>μ̂_MLE = x̄</code> 並畫直方圖。拖動 n 觀察：<strong>(1)</strong> 分布逐漸集中於真值 5 (一致性)、<strong>(2)</strong> 標準差以 <code>σ/√n</code> 收縮、<strong>(3)</strong> 形狀漸近常態 (asymptotic normality)。</p></div>
+<div data-lang="en"><p>Repeatedly sample from N(μ=5, σ=2), <code>B = 500</code> times. Each replicate computes <code>μ̂_MLE = x̄</code>; we histogram them. Drag n to see: <strong>(1)</strong> the distribution concentrates on the true 5 (consistency), <strong>(2)</strong> SD shrinks like <code>σ/√n</code>, <strong>(3)</strong> the shape becomes Gaussian (asymptotic normality).</p></div>
+<div class="interactive-panel">
+<div class="sim-stats"><span class="sim-stat pass" id="statN">n = 10</span><span class="sim-stat pass" id="statSE">SE ≈ —</span><span class="sim-stat pass" id="statMeanMLE">x̄ of x̄ ≈ —</span></div>
+<div class="slider-group"><label><span data-zh="樣本數 n" data-en="Sample size n">樣本數 n</span> <span id="valN">10</span></label><input type="range" id="sliderN" min="2" max="500" value="10" step="1"></div>
+<div class="chart-container"><canvas id="mleChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="X：估計值 μ̂；Y：頻率。紅線：真實 μ = 5。" data-en="X: estimate μ̂; Y: frequency. Red line: true μ = 5.">X：估計值 μ̂；Y：頻率。紅線：真值。</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Shrinkage ===== -->
+<section class="section">
+<div class="section-label" data-zh="進階觀念" data-en="ADVANCED">進階觀念</div>
+<h2 data-zh="三、收縮估計：為什麼 limma 與 DESeq2 都不用 MLE？" data-en="III. Shrinkage: why limma and DESeq2 reject the per-gene MLE">三、收縮估計：limma 與 DESeq2 為何不用 MLE？</h2>
+<div data-lang="zh">
+<p>在<em>多參數</em>問題 (e.g. 20,000 個基因的變異數 σ²ⱼ) 中，每個 σ²ⱼ 的 per-gene MLE 在 n=3 樣本下變異極大；James-Stein (1961) 證明把估計值「往全體均值收縮」一律 dominates MLE (MSE 更低，p ≥ 3)。limma 的 <code>squeezeVar</code>、DESeq2 的 <code>estimateDispersionsMAP</code> 都是同一精神：把 per-gene MLE 用全體 (或趨勢) 作為先驗壓回去。</p>
+<p>DESeq2 的兩步流程：<code>estimateDispersionsGeneEst</code> 算 per-gene MLE α̂ⱼ → 擬合 dispersion-mean trend → <code>estimateDispersionsMAP</code> 用 trend 當先驗做 MAP 收縮。低表達基因樣本少、MLE 雜訊大，收縮帶來最大改善。</p>
+</div>
+<div data-lang="en">
+<p>In <em>multi-parameter</em> problems (e.g. 20,000 per-gene variances σ²ⱼ) the per-gene MLE has huge variance at n=3. James-Stein (1961) proved that shrinking estimates toward the group mean strictly dominates the MLE in total MSE (for p ≥ 3). limma's <code>squeezeVar</code> and DESeq2's <code>estimateDispersionsMAP</code> apply this idea: pull per-gene MLEs toward the overall (or trend) prior.</p>
+<p>DESeq2's two-step: <code>estimateDispersionsGeneEst</code> computes per-gene MLE α̂ⱼ → fit a dispersion-vs-mean trend → <code>estimateDispersionsMAP</code> does MAP shrinkage with that trend as prior. Low-count genes (noisy MLE) gain the most from shrinkage.</p>
+</div>
+<table class="comp-table">
+<thead><tr>
+<th data-zh="估計量" data-en="Estimator">估計量</th>
+<th data-zh="偏誤" data-en="Bias">偏誤</th>
+<th data-zh="變異數" data-en="Variance">變異數</th>
+<th data-zh="MSE 排名 (RNA-seq n=3)" data-en="MSE rank (RNA-seq n=3)">MSE 排名</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">Per-gene MLE α̂</td><td data-lang="zh">≈ 0</td><td data-lang="zh">極高</td><td data-lang="zh">最差</td><td data-lang="en">Per-gene MLE α̂</td><td data-lang="en">≈ 0</td><td data-lang="en">very high</td><td data-lang="en">worst</td></tr>
+<tr><td data-lang="zh">Trend (fitted)</td><td data-lang="zh">偏向 trend</td><td data-lang="zh">極低</td><td data-lang="zh">中</td><td data-lang="en">Fitted trend</td><td data-lang="en">trend-biased</td><td data-lang="en">very low</td><td data-lang="en">middle</td></tr>
+<tr><td data-lang="zh">MAP shrinkage (DESeq2)</td><td data-lang="zh">小</td><td data-lang="zh">低</td><td data-lang="zh">最佳</td><td data-lang="en">MAP shrinkage (DESeq2)</td><td data-lang="en">small</td><td data-lang="en">low</td><td data-lang="en">best</td></tr>
+</tbody></table>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>對 NB dispersion 在 n=3 條件下取 per-gene MLE，然後直接代入 Wald 檢定──低 count 基因會被噪音放大成假陽性。<strong>解：</strong>必須做 dispersion shrinkage (DESeq2 預設、edgeR 的 <code>estimateGLMTrendedDisp</code>)。</span>
+<span data-lang="en"><strong>Common mistake:</strong> taking per-gene MLE NB dispersion at n=3, then feeding it straight into Wald tests — low-count genes become noise-amplified false positives. <strong>Fix:</strong> dispersion shrinkage (DESeq2 default; edgeR's <code>estimateGLMTrendedDisp</code>).</span>
+</div></div>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：MLE、asymptotic SE 與 bootstrap" data-en="Code: MLE, asymptotic SE, and bootstrap">實作：MLE 與 bootstrap</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r2')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py2')">Python</button></div>
+<div class="code-tab-content active" id="r2"><pre><span class="comment"># --- R --- MLE 與漸近 SE</span>
+<span class="comment"># 1) 寫負對數概似函數 (negative log-likelihood)</span>
+nll &lt;- <span class="kw">function</span>(theta, x) {
+  mu &lt;- theta[<span class="num">1</span>]; sigma &lt;- <span class="func">exp</span>(theta[<span class="num">2</span>])   <span class="comment"># reparam 保證 sigma &gt; 0</span>
+  -<span class="func">sum</span>(<span class="func">dnorm</span>(x, mu, sigma, log=<span class="kw">TRUE</span>))
+}
+fit &lt;- <span class="func">optim</span>(<span class="func">c</span>(<span class="num">0</span>, <span class="num">0</span>), nll, x=x, hessian=<span class="kw">TRUE</span>, method=<span class="str">"BFGS"</span>)
+mle  &lt;- fit$par                                  <span class="comment"># [μ̂, log σ̂]</span>
+se   &lt;- <span class="func">sqrt</span>(<span class="func">diag</span>(<span class="func">solve</span>(fit$hessian)))     <span class="comment"># asymptotic SE</span>
+
+<span class="comment"># 2) 捷徑：MASS::fitdistr 直接擬合家族</span>
+<span class="func">library</span>(MASS)
+<span class="func">fitdistr</span>(x, <span class="str">"normal"</span>)$estimate
+<span class="func">fitdistr</span>(counts, <span class="str">"negative binomial"</span>)$estimate   <span class="comment"># mu, size</span>
+
+<span class="comment"># 3) Bootstrap SE</span>
+B &lt;- <span class="num">2000</span>
+boot_mu &lt;- <span class="func">replicate</span>(B, <span class="func">mean</span>(<span class="func">sample</span>(x, <span class="func">length</span>(x), replace=<span class="kw">TRUE</span>)))
+<span class="func">sd</span>(boot_mu)                                      <span class="comment"># bootstrap SE of μ̂</span></pre></div>
+<div class="code-tab-content" id="py2"><pre><span class="comment"># --- Python --- MLE 與漸近 SE</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">from</span> scipy <span class="kw">import</span> optimize, stats
+
+<span class="comment"># 1) 自寫 NLL 與 optimize.minimize</span>
+<span class="kw">def</span> nll(theta, x):
+    mu, log_sigma = theta
+    sigma = np.exp(log_sigma)
+    <span class="kw">return</span> -np.<span class="func">sum</span>(stats.norm.logpdf(x, mu, sigma))
+
+res = optimize.minimize(nll, x0=[<span class="num">0</span>, <span class="num">0</span>], args=(x,), method=<span class="str">"BFGS"</span>)
+mle  = res.x
+<span class="comment"># 漸近 SE：Hessian 的反矩陣對角線開根號</span>
+<span class="kw">import</span> numdifftools <span class="kw">as</span> nd
+H  = nd.Hessian(<span class="kw">lambda</span> t: nll(t, x))(mle)
+se = np.<span class="func">sqrt</span>(np.diag(np.linalg.inv(H)))
+
+<span class="comment"># 2) statsmodels GLM / GenericLikelihoodModel: 自動回傳 SE + Wald</span>
+<span class="kw">import</span> statsmodels.api <span class="kw">as</span> sm
+nb = sm.GLM(y, X, family=sm.families.NegativeBinomial()).<span class="func">fit</span>()
+nb.summary()
+
+<span class="comment"># 3) Bootstrap SE</span>
+boot_mu = np.array([np.mean(np.random.choice(x, len(x), replace=<span class="kw">True</span>)) <span class="kw">for</span> _ <span class="kw">in</span> <span class="func">range</span>(<span class="num">2000</span>)])
+boot_mu.<span class="func">std</span>()</pre></div>
+</div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. 為什麼 MLE 估出來的母體變異數 (用 1/n 而非 1/(n−1)) 是<strong>有偏低估</strong>？</p>
+<p data-lang="en">1. Why is the MLE of population variance (using 1/n rather than 1/(n−1)) <strong>biased downward</strong>?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. MLE 在大樣本下永遠有偏</span><span data-lang="en">A. MLE is always biased in large samples</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 我們用樣本均值 x̄ 取代未知 μ，「估計」自身會吸收一個自由度</span><span data-lang="en">B. We replace unknown μ by the sample mean x̄, which absorbs one degree of freedom</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 因為 σ² 必須 &gt; 0</span><span data-lang="en">C. Because σ² must be &gt; 0</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 因為 CLT 失效</span><span data-lang="en">D. Because CLT fails</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">2. 對 Gaussian (σ² 已知) 的均值 μ，CRLB 等於？</p>
+<p data-lang="en">2. For Gaussian mean μ (σ² known), the CRLB equals?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. σ² / n</span><span data-lang="en">A. σ² / n</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. σ² · n</span><span data-lang="en">B. σ² · n</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 1 / σ²</span><span data-lang="en">C. 1 / σ²</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. n / σ</span><span data-lang="en">D. n / σ</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">3. 何時有偏估計可以打敗無偏估計？</p>
+<p data-lang="en">3. When can a biased estimator beat an unbiased one?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 永遠不行，無偏一定最好</span><span data-lang="en">A. Never — unbiased is always best</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 只在小樣本下</span><span data-lang="en">B. Only in small samples</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 當 bias² 增加幅度 &lt; 變異數下降幅度 → 整體 MSE 更小</span><span data-lang="en">C. When the increase in bias² is less than the drop in variance — overall MSE drops</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 當資料量無限</span><span data-lang="en">D. When the data is infinite</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="probability-and-distributions.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Prev">← 上一步</span><span class="nav-title">Step 1: Probability & Distributions</span></a>
+<a href="confidence-intervals-bootstrap.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 3: Confidence Intervals & Bootstrap</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Box-Muller normal
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+const mleChart=new Chart(document.getElementById('mleChart'),{type:'bar',data:{labels:[],datasets:[{label:'μ̂ = x̄ over B=500 samples',data:[],backgroundColor:'rgba(26,107,90,0.55)',borderColor:'rgba(26,107,90,0.9)',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'},annotation:{}},scales:{x:{title:{display:true,text:'μ̂'}},y:{title:{display:true,text:'count'},beginAtZero:true}}}});
+
+function updateMLE(){
+  const n=+document.getElementById('sliderN').value;
+  document.getElementById('valN').textContent=n;
+  document.getElementById('statN').textContent='n = '+n;
+  const muTrue=5,sigma=2,B=500;
+  const mles=[];
+  for(let b=0;b<B;b++){let s=0;for(let i=0;i<n;i++)s+=muTrue+sigma*randn();mles.push(s/n);}
+  // histogram with fixed range
+  const lo=2,hi=8,bins=30,w=(hi-lo)/bins;
+  const counts=new Array(bins).fill(0),labels=[];
+  for(let i=0;i<bins;i++)labels.push((lo+(i+0.5)*w).toFixed(1));
+  for(const v of mles){let k=Math.floor((v-lo)/w);if(k<0)k=0;if(k>=bins)k=bins-1;counts[k]++;}
+  mleChart.data.labels=labels;mleChart.data.datasets[0].data=counts;mleChart.update('none');
+  const mean=mles.reduce((a,b)=>a+b)/B;
+  const sd=Math.sqrt(mles.reduce((a,b)=>a+(b-mean)*(b-mean),0)/B);
+  const L=I18n.get();
+  document.getElementById('statSE').textContent=(L==='zh'?'SE ≈ ':'SE ≈ ')+sd.toFixed(3)+(L==='zh'?'  (理論 σ/√n = ':'  (theory σ/√n = ')+(sigma/Math.sqrt(n)).toFixed(3)+')';
+  document.getElementById('statMeanMLE').textContent=(L==='zh'?'x̄ 的平均 ≈ ':'Mean of x̄ ≈ ')+mean.toFixed(3);
+}
+document.getElementById('sliderN').addEventListener('input',updateMLE);
+document.addEventListener('langchange',updateMLE);
+updateMLE();
+
+// Quiz
+const QF={
+  zh:{q1_y:'樣本均值 x̄ 已使用一個自由度去逼近 μ，殘差自由度只剩 n-1；用 1/n 平均平方殘差會系統性低估 σ²，故需 Bessel 校正 (1/(n-1))。',q1_n:'正確答案已標示。',q2_y:'I(μ)=1/σ²，CRLB = 1/(n·I) = σ²/n，X̄ 的變異數剛好達到，所以 X̄ 是 UMVUE。',q2_n:'正確答案已標示。',q3_y:'MSE = bias² + variance。允許小幅偏誤換取大幅變異數下降，整體 MSE 更小──這正是 James-Stein、limma、DESeq2 收縮的數學基礎。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'x̄ already absorbed one degree of freedom estimating μ, so residual df is n-1. Dividing by n underestimates σ² systematically — hence Bessel correction (1/(n-1)).',q1_n:'Correct answer highlighted.',q2_y:'I(μ)=1/σ², CRLB = 1/(n·I) = σ²/n, and X̄ achieves it — so X̄ is the UMVUE.',q2_n:'Correct answer highlighted.',q3_y:'MSE = bias² + variance. A small bias buying a large variance drop reduces total MSE — the basis for James-Stein, limma, and DESeq2 shrinkage.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

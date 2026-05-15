@@ -1,0 +1,380 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 12: Posterior Summaries, Bayes Factors, PPC — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html" class="active">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 12 / 17</div>
+<h1 data-zh="後驗摘要、貝氏因子、PPC (Posterior Summaries, Bayes Factors, PPC)" data-en="Posterior Summaries, Bayes Factors, PPC">後驗摘要、貝氏因子、PPC</h1>
+<p class="subtitle" data-lang="zh">從可信區間到 PPC 與 LOO：把後驗化為可用的結論，並用後驗預測檢查抓出模型誤設。</p>
+<p class="subtitle" data-lang="en">From credible intervals to PPC and LOO — turning posteriors into decisions and catching model misspecification with posterior predictive checks.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Why ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="後驗到底要怎麼讀？" data-en="How do we read a posterior?">後驗到底要怎麼讀？</h2>
+<div data-lang="zh">
+<p>後驗分布本身包含<strong>所有</strong>關於 θ 的事後資訊。實務上我們需要把它壓縮成幾個摘要：點估計、區間估計、方向機率、模型比較。每一種摘要回答不同的問題，混用會造成解讀錯誤。</p>
+<p>本章關鍵：(1) <strong>可信區間 (credible interval, CrI)</strong> 是真正的「機率落在這個範圍」陳述，與頻率派 CI 不同；(2) 對偏態後驗，<strong>HDI</strong> 比 ETI 更合適；(3) <strong>方向機率</strong> <code>P(θ &gt; 0 | y)</code> 是貝氏取代 p-value 的自然摘要；(4) <strong>貝氏因子</strong>提供模型比較，但對先驗極度敏感；(5) <strong>後驗預測檢查 (PPC)</strong> 與 <strong>LOO-CV</strong> 是真正抓得到「模型錯了」的工具。</p>
+</div>
+<div data-lang="en">
+<p>The posterior contains <strong>all</strong> the information about θ after seeing data. In practice we compress it into summaries: point estimates, intervals, direction probabilities, model comparisons. Each answers a different question, and mixing them up leads to misinterpretation.</p>
+<p>Key ideas this chapter: (1) the <strong>credible interval (CrI)</strong> is a genuine "probability θ lies here" statement — the interpretation people wrongly attach to frequentist CIs; (2) for skewed posteriors, <strong>HDI</strong> is preferable to ETI; (3) the <strong>direction probability</strong> <code>P(θ &gt; 0 | y)</code> is the natural Bayesian replacement for a p-value; (4) <strong>Bayes factors</strong> compare models but are exquisitely sensitive to priors; (5) <strong>posterior predictive checks (PPC)</strong> and <strong>LOO-CV</strong> are the tools that actually catch a wrong model.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>「給定資料與模型，95% 機率 θ 落在這個區間」是<em>可信區間</em>的正確解讀。<em>頻率派的 95% CI 並不能這樣說。</em> 這是貝氏推論最受歡迎的賣點，也是學生最容易把兩者混為一談的地方。</span>
+<span data-lang="en"><strong>Core principle:</strong> "Given the data and the model, there is a 95% probability θ lies in this interval" is the correct reading of a <em>credible</em> interval. <em>A frequentist 95% CI does not support that reading.</em> This is Bayesian inference's biggest selling point — and where students most often conflate the two.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、四種後驗摘要" data-en="I. Four Posterior Summaries">一、四種後驗摘要</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">📏</div><h4 data-zh="ETI vs HDI 區間" data-en="ETI vs HDI Intervals">ETI vs HDI 區間</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>ETI (Equal-Tailed Interval)</strong>：取 2.5% 與 97.5% 百分位數，左右尾各切 2.5%。對稱、易計算。</li>
+<li><strong>HDI (Highest Density Interval)</strong>：取「最窄」的 95% 區間——保證區間內每點密度 ≥ 區間外。</li>
+<li>對稱後驗 → 兩者相同；偏態 / 截斷後驗 → HDI 更貼近高密度區，更可解釋。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>ETI</strong>: cut 2.5% off each tail. Symmetric, trivial to compute.</li>
+<li><strong>HDI</strong>: the <em>narrowest</em> 95% interval — every point inside has density ≥ every point outside.</li>
+<li>For symmetric posteriors, ETI = HDI; for skewed / bounded posteriors, HDI tracks the high-density mass.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🎯</div><h4 data-zh="方向機率與 ROPE" data-en="Direction Probability & ROPE">方向機率與 ROPE</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>P(θ &gt; 0 | y)</strong>：直接陳述「效應為正的後驗機率」——比 p-value 更易解讀。</li>
+<li><strong>ROPE (Region of Practical Equivalence)</strong>：先定義「實務上等於零」的小區間 (例如 |β| &lt; 0.1)，再算 <code>P(θ ∈ ROPE | y)</code>。</li>
+<li>實作：<code>bayestestR::p_direction, rope</code>；ArviZ 沒有官方 ROPE，自己用 idata 算即可。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>P(θ &gt; 0 | y)</strong>: "posterior probability the effect is positive" — far easier to read than a p-value.</li>
+<li><strong>ROPE</strong>: define a "practically zero" range (e.g. |β| &lt; 0.1), then compute <code>P(θ ∈ ROPE | y)</code>.</li>
+<li>Tools: <code>bayestestR::p_direction, rope</code>; ArviZ has no built-in ROPE, but compute it on draws directly.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">⚖️</div><h4 data-zh="貝氏因子 (Bayes Factor)" data-en="Bayes Factor (BF)">貝氏因子</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><code>BF₁₀ = p(y|M₁) / p(y|M₀)</code>：兩個模型邊際概似的比。</li>
+<li>Jeffreys: BF &gt; 3 弱證據；&gt; 10 強；&gt; 100 極強。</li>
+<li><strong>對先驗極端敏感 (Lindley's paradox)</strong>——拉寬先驗會直接懲罰較複雜模型，使 BF 任意偏向 H₀。</li>
+<li>邊際概似積分難算，常用 bridge sampling、Savage-Dickey ratio。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><code>BF₁₀ = p(y|M₁) / p(y|M₀)</code> — ratio of marginal likelihoods.</li>
+<li>Jeffreys scale: BF &gt; 3 weak; &gt; 10 strong; &gt; 100 decisive.</li>
+<li><strong>Wildly sensitive to priors (Lindley's paradox)</strong>: widening the prior penalizes the richer model and pushes BF toward H₀.</li>
+<li>Marginal likelihoods are hard integrals — bridge sampling, Savage-Dickey ratio.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🔁</div><h4 data-zh="PPC 與 LOO-CV" data-en="PPC and LOO-CV">PPC 與 LOO-CV</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>PPC</strong>：從後驗預測抽 <code>y_rep</code>，與觀測 <code>y</code> 比較分布特徵——抓 model misfit 的最強工具。</li>
+<li>選測試統計量要對應問題：count 模型用「零比例」、「最大值」、「Var/Mean」。</li>
+<li><strong>LOO-CV (PSIS)</strong>：以 Pareto-smoothed importance sampling 近似留一交叉驗證的 elpd。</li>
+<li><code>k_hat &gt; 0.7</code> 表示某觀察過度影響估計——用 <code>reloo</code> 重抽或調整。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>PPC</strong>: draw <code>y_rep</code> from the posterior predictive and compare to observed <code>y</code> — the single best tool for detecting misfit.</li>
+<li>Pick test statistics aligned with the question: zero-fraction, max, Var/Mean for counts.</li>
+<li><strong>LOO-CV (PSIS)</strong>: Pareto-smoothed importance sampling approximates leave-one-out elpd.</li>
+<li><code>k_hat &gt; 0.7</code> flags an observation that the importance-sampling approximation can't handle — use <code>reloo</code>.</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>R-hat 通過 ≠ 模型正確：</strong>收斂診斷只告訴你「鏈條探索了後驗」；PPC 告訴你「後驗本身是不是針對對的模型」。兩個檢查的層次完全不同。即使所有 R-hat = 1.00、ESS 滿格，PPC 仍可能顯示嚴重 misfit——這就是為何 PPC 不可省略。</div>
+<div data-lang="en"><strong>R-hat passing does not mean the model is right.</strong> Convergence diagnostics tell you the chains explored the posterior; PPC tells you whether the posterior corresponds to the right model. Even with R-hat = 1.00 and full ESS, PPC can still expose a badly misspecified likelihood — that's why you cannot skip it.</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive PPC ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="後驗預測檢查 (PPC) 模擬器：常態 vs NB" data-en="Posterior Predictive Check: Normal vs NB">PPC 模擬器：常態 vs NB</h2>
+<div data-lang="zh"><p>觀察資料是過度離散的計數 (NB 抽樣)。切換「擬合模型」：誤設的常態模型會生出對稱、可為負的 <code>y_rep</code>，與觀察直方圖明顯不一致；NB 模型則覆蓋得當。<em>這正是 PPC 在實務上能立刻發現問題的場景</em>。</p></div>
+<div data-lang="en"><p>The observed data are overdispersed counts (drawn from NB). Toggle the fitted model: a misspecified Normal generates symmetric, possibly negative <code>y_rep</code> that clearly clash with the observed histogram, whereas NB covers it well. <em>This is the situation where PPC instantly flags a problem.</em></p></div>
+<div class="interactive-panel">
+<div class="sim-stats"><span class="sim-stat pass" id="ppcObsMean">—</span><span class="sim-stat pass" id="ppcObsVar">—</span><span class="sim-stat fail" id="ppcModel">—</span></div>
+<div class="slider-group">
+  <label><span data-zh="擬合模型" data-en="Fitted Model">擬合模型</span></label>
+  <select id="ppcModelSel" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e0;">
+    <option value="normal">Normal (misspecified)</option>
+    <option value="nb" selected>Negative Binomial (correct)</option>
+  </select>
+</div>
+<div class="slider-group"><label><span data-zh="真實 μ" data-en="True μ">真實 μ</span> <span id="valPMu">8</span></label><input type="range" id="sliderPMu" min="2" max="30" value="8" step="1"></div>
+<div class="slider-group"><label><span data-zh="真實 dispersion α" data-en="True dispersion α">真實 α</span> <span id="valPAlpha">0.6</span></label><input type="range" id="sliderPAlpha" min="0" max="150" value="60" step="5"></div>
+<div style="text-align:center;margin:6px 0;">
+  <button id="ppcResample" style="padding:6px 14px;border-radius:6px;border:1px solid #2c5282;background:#2c5282;color:white;cursor:pointer;"><span data-zh="重抽樣" data-en="Resample">重抽樣</span></button>
+</div>
+<div class="chart-container"><canvas id="ppcChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="灰柱：觀察 y；彩色線：8 條 y_rep" data-en="Grey bars: observed y; coloured lines: 8 y_rep replicates">灰柱：觀察 y；彩色線：8 條 y_rep</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Decision Guide ===== -->
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、要報哪個摘要？要做哪個比較？" data-en="II. Which Summary? Which Comparison?">二、要報哪個摘要與比較？</h2>
+
+<div class="decision-tree">
+<h4>🌳 <span data-zh="後驗摘要決策樹" data-en="Summary Selection Flow">後驗摘要決策樹</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>要陳述「效應方向」？<span class="dt-arrow">→</span> 報 <code>P(θ &gt; 0 | y)</code> 與後驗中位數。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>要陳述「效應大小範圍」？<span class="dt-arrow">→</span> 後驗對稱用 ETI，偏態用 <strong>HDI</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>要比較「兩個模型」？<span class="dt-arrow">→</span> 預測能力 → LOO / WAIC；先驗有實質意義 → 貝氏因子（並做先驗敏感性）。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>要檢驗「模型是否擬合好」？<span class="dt-arrow">→</span> 永遠先做 PPC——選擇與問題相關的測試統計量。</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>「實務上是否與零等價」？<span class="dt-arrow">→</span> 先定 ROPE，報 <code>P(θ ∈ ROPE)</code>。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Want to state direction of effect? <span class="dt-arrow">→</span> Report <code>P(θ &gt; 0 | y)</code> + posterior median.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Want an effect-size range? <span class="dt-arrow">→</span> ETI for symmetric posteriors, <strong>HDI</strong> for skewed/bounded ones.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Compare two models? <span class="dt-arrow">→</span> predictive performance → LOO / WAIC; meaningful priors → Bayes factor (always run a prior-sensitivity check).</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Check model fit? <span class="dt-arrow">→</span> always start with PPC using a problem-relevant test statistic.</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>"Practically equivalent to zero"? <span class="dt-arrow">→</span> define a ROPE and report <code>P(θ ∈ ROPE)</code>.</div></div>
+</div>
+</div>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="問題" data-en="Question">問題</th>
+<th data-zh="摘要 / 工具" data-en="Summary / Tool">摘要 / 工具</th>
+<th data-zh="注意" data-en="Caveat">注意</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">效應方向</td><td data-lang="zh">P(θ&gt;0|y), 中位數</td><td data-lang="zh">勿與 p-value 混淆</td><td data-lang="en">Direction of effect</td><td data-lang="en">P(θ&gt;0|y), median</td><td data-lang="en">do not conflate with p-value</td></tr>
+<tr><td data-lang="zh">效應幅度區間</td><td data-lang="zh">95% HDI / ETI</td><td data-lang="zh">偏態後驗用 HDI</td><td data-lang="en">Effect-size range</td><td data-lang="en">95% HDI / ETI</td><td data-lang="en">HDI for skewed posteriors</td></tr>
+<tr><td data-lang="zh">模型比較 (預測)</td><td data-lang="zh">LOO / WAIC + SE</td><td data-lang="zh">k_hat &gt; 0.7 處需 reloo</td><td data-lang="en">Model comparison (predictive)</td><td data-lang="en">LOO / WAIC + SE</td><td data-lang="en">refit with reloo when k_hat &gt; 0.7</td></tr>
+<tr><td data-lang="zh">模型比較 (假說)</td><td data-lang="zh">Bayes factor (bridge / SD)</td><td data-lang="zh">先驗敏感、Lindley paradox</td><td data-lang="en">Model comparison (hypothesis)</td><td data-lang="en">Bayes factor (bridge / SD)</td><td data-lang="en">prior-sensitive, Lindley's paradox</td></tr>
+<tr><td data-lang="zh">擬合好壞</td><td data-lang="zh">PPC + 對應 test stat</td><td data-lang="zh">test stat 要切題</td><td data-lang="en">Goodness of fit</td><td data-lang="en">PPC + targeted test stat</td><td data-lang="en">choose test stats aligned with the question</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：HDI、PPC、LOO、Bayes Factor" data-en="Code: HDI, PPC, LOO, Bayes Factor">實作：HDI、PPC、LOO、Bayes Factor</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- brms / tidybayes / loo / bayestestR</span>
+<span class="func">library</span>(brms); <span class="func">library</span>(tidybayes); <span class="func">library</span>(bayesplot)
+<span class="func">library</span>(loo);  <span class="func">library</span>(bayestestR); <span class="func">library</span>(bridgesampling)
+
+<span class="comment"># 1) 後驗摘要：median + HDI</span>
+<span class="func">posterior_summary</span>(fit)                       <span class="comment"># 預設報 ETI</span>
+fit |&gt; <span class="func">spread_draws</span>(b_x) |&gt; <span class="func">median_hdci</span>(b_x, .width=<span class="num">.95</span>)
+
+<span class="comment"># 2) 方向機率與 ROPE</span>
+<span class="func">p_direction</span>(fit)
+<span class="func">rope</span>(fit, range=<span class="func">c</span>(<span class="num">-0.1</span>, <span class="num">0.1</span>))
+
+<span class="comment"># 3) PPC：密度疊圖 + 測試統計量</span>
+y     &lt;- df$y
+yrep  &lt;- <span class="func">posterior_predict</span>(fit, draws=<span class="num">100</span>)
+<span class="func">ppc_dens_overlay</span>(y, yrep[<span class="num">1</span>:<span class="num">50</span>, ])
+<span class="func">ppc_stat</span>(y, yrep, stat = <span class="kw">function</span>(x) <span class="func">mean</span>(x == <span class="num">0</span>))   <span class="comment"># 零比例</span>
+<span class="func">ppc_stat</span>(y, yrep, stat = <span class="str">"max"</span>)
+
+<span class="comment"># 4) LOO 與模型比較</span>
+loo1 &lt;- <span class="func">loo</span>(fit_normal)
+loo2 &lt;- <span class="func">loo</span>(fit_nb)
+<span class="func">loo_compare</span>(loo1, loo2)                       <span class="comment"># 差距 / SE</span>
+<span class="func">pareto_k_table</span>(loo2)
+
+<span class="comment"># 5) Bayes factor (bridge sampling)</span>
+bf_obj &lt;- <span class="func">bayesfactor_models</span>(fit1, fit2, denominator=<span class="num">2</span>)</pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python --- PyMC + ArviZ</span>
+<span class="kw">import</span> pymc <span class="kw">as</span> pm, arviz <span class="kw">as</span> az, numpy <span class="kw">as</span> np
+
+<span class="kw">with</span> model:
+    idata = pm.sample()
+    pm.sample_posterior_predictive(idata, extend_inferencedata=<span class="kw">True</span>)
+
+<span class="comment"># 1) HDI / 摘要</span>
+az.summary(idata, hdi_prob=<span class="num">0.95</span>)
+hdi = az.hdi(idata, hdi_prob=<span class="num">0.95</span>)
+
+<span class="comment"># 2) 方向機率與 ROPE（手動）</span>
+draws = idata.posterior[<span class="str">"beta"</span>].values.flatten()
+p_dir = (draws &gt; <span class="num">0</span>).mean()
+p_rope = ((draws &gt; <span class="num">-0.1</span>) & (draws &lt; <span class="num">0.1</span>)).mean()
+
+<span class="comment"># 3) PPC</span>
+az.plot_ppc(idata, num_pp_samples=<span class="num">50</span>)
+<span class="comment"># 自訂 test stat</span>
+y     = idata.observed_data[<span class="str">"y"</span>].values
+y_rep = idata.posterior_predictive[<span class="str">"y"</span>].values.reshape(-<span class="num">1</span>, y.size)
+zero_obs  = (y == <span class="num">0</span>).mean()
+zero_rep  = (y_rep == <span class="num">0</span>).mean(axis=<span class="num">1</span>)
+p_bayes_p = (zero_rep &gt;= zero_obs).mean()       <span class="comment"># bayesian p-value</span>
+
+<span class="comment"># 4) LOO 與比較</span>
+loo_nb     = az.loo(idata_nb)
+loo_normal = az.loo(idata_normal)
+az.compare({<span class="str">"NB"</span>: idata_nb, <span class="str">"Normal"</span>: idata_normal}, ic=<span class="str">"loo"</span>)
+
+<span class="comment"># 5) Bayes factor (Savage-Dickey ratio at θ=0)</span>
+<span class="comment"># prior_density_at_0 / posterior_density_at_0</span></pre></div>
+</div>
+
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>用 BF 比較模型時把先驗放得「很弱」希望「公平」。其實這會<em>系統性</em>偏向較簡單的 H₀。BF 報導時一定要說清楚先驗、並做敏感性分析；只看單一 BF 的論文應被質疑。</span>
+<span data-lang="en"><strong>Common mistake:</strong> using very wide priors to "be fair" when computing a Bayes factor. This systematically tips BF toward the simpler H₀ (Lindley's paradox). Always disclose priors and report a sensitivity analysis — any paper reporting a single BF without this should be treated with suspicion.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. 95% 可信區間 (CrI) 的正確解讀是？</p>
+<p data-lang="en">1. What is the correct interpretation of a 95% credible interval?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 重複實驗 100 次，約 95 次會包含真值</span><span data-lang="en">A. If we repeated the experiment many times, ~95% of intervals would contain the true value</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 給定資料與模型，θ 有 95% 機率落在這個區間</span><span data-lang="en">B. Given the data and model, θ lies in this interval with 95% probability</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. p-value ≤ 0.05</span><span data-lang="en">C. p-value ≤ 0.05</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 估計量的 95% 信賴度</span><span data-lang="en">D. The 95% confidence level of the estimator</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 為何 Bayes factor 對先驗高度敏感？這是特性還是缺點？</p>
+<p data-lang="en">2. Why is the Bayes factor so sensitive to the prior — is that a feature or a bug?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 與先驗無關，是純粹資料量</span><span data-lang="en">A. It is independent of the prior, purely data-driven</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 因為 MCMC 抽樣誤差</span><span data-lang="en">B. It is just MCMC noise</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 邊際概似 ∫p(y|θ)p(θ)dθ 會直接懲罰先驗質量分散到不合理區的模型；既是特性，也是常被誤用的缺陷</span><span data-lang="en">C. The marginal likelihood ∫p(y|θ)p(θ)dθ penalises models that spread prior mass over implausible regions — a real feature, and a frequently misused pitfall</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 因為計算太貴</span><span data-lang="en">D. Because it is expensive to compute</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. PPC 能抓到、但 R-hat 無法察覺的問題是？</p>
+<p data-lang="en">3. What does a posterior predictive check catch that R-hat does not?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 概似模型誤設 (例如把 NB 計數套常態)</span><span data-lang="en">A. Misspecification of the likelihood (e.g. fitting a Normal to NB counts)</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 鏈條混合差</span><span data-lang="en">B. Poor mixing of chains</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 步長太大</span><span data-lang="en">C. Excessive step size</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. divergent transitions</span><span data-lang="en">D. Divergent transitions</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="mcmc-diagnostics.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 11: MCMC & Diagnostics</span></a>
+<a href="empirical-bayes-limma.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 13: Empirical Bayes & limma</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// --- PPC widget: observe NB data, fit Normal vs NB, draw y_rep ---
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function gammaSample(shape,scale){
+  // Marsaglia & Tsang for shape >= 1
+  if(shape<1){const u=Math.random();return gammaSample(shape+1,scale)*Math.pow(u,1/shape);}
+  const d=shape-1/3, c=1/Math.sqrt(9*d);
+  while(true){let x,v;do{x=randn();v=1+c*x;}while(v<=0);v=v*v*v;const u=Math.random();
+    if(u<1-0.0331*x*x*x*x)return d*v*scale;
+    if(Math.log(u)<0.5*x*x+d*(1-v+Math.log(v)))return d*v*scale;}
+}
+function poissonSample(lam){
+  if(lam<30){let L=Math.exp(-lam),k=0,p=1;do{k++;p*=Math.random();}while(p>L);return k-1;}
+  // normal approx
+  return Math.max(0,Math.round(lam+Math.sqrt(lam)*randn()));
+}
+function nbSample(mu,alpha){
+  if(alpha<=1e-4)return poissonSample(mu);
+  const size=1/alpha;const lam=gammaSample(size, mu/size);return poissonSample(lam);
+}
+function normalSample(mu,sd){return mu+sd*randn();}
+
+function histBins(arr,bins,xmax){
+  const c=new Array(bins).fill(0);
+  arr.forEach(v=>{const x=Math.max(0,Math.min(xmax-1e-9,v));const i=Math.floor(x/xmax*bins);if(i>=0&&i<bins)c[i]++;});
+  const tot=arr.length||1;return c.map(v=>v/tot);
+}
+
+let obsY=[];
+function genObs(mu,alpha){obsY=[];for(let i=0;i<150;i++)obsY.push(nbSample(mu,alpha));}
+
+const PPC_COLORS=['#e53e3e','#dd6b20','#d69e2e','#38a169','#3182ce','#805ad5','#d53f8c','#319795'];
+const BINS=20;
+
+const ppcChart=new Chart(document.getElementById('ppcChart'),{type:'line',data:{labels:[],datasets:[]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top',labels:{filter:(item,c)=>item.datasetIndex===0||item.datasetIndex===1}}},
+    scales:{x:{title:{display:true,text:'y'}},y:{title:{display:true,text:'relative frequency'},beginAtZero:true}}}});
+
+function renderPPC(){
+  const mu=+document.getElementById('sliderPMu').value;
+  const alpha=(+document.getElementById('sliderPAlpha').value)/100;
+  const model=document.getElementById('ppcModelSel').value;
+  document.getElementById('valPMu').textContent=mu;
+  document.getElementById('valPAlpha').textContent=alpha.toFixed(2);
+  if(obsY.length===0)genObs(mu,alpha);
+  // estimate model parameters from obs (pretend "fit")
+  const yMean=obsY.reduce((s,v)=>s+v,0)/obsY.length;
+  const yVar =obsY.reduce((s,v)=>s+(v-yMean)*(v-yMean),0)/obsY.length;
+  const ySd=Math.sqrt(yVar);
+  // NB method-of-moments: alphaHat = max((var-mean)/mean^2, tiny)
+  const aHat=Math.max(1e-3,(yVar-yMean)/(yMean*yMean));
+  // x range
+  const xmax=Math.max(20,Math.ceil(yMean+5*ySd));
+  const labels=Array.from({length:BINS},(_,i)=>Math.round((i+0.5)*xmax/BINS));
+  // observed bars (use bar overlay via dataset type)
+  const obsHist=histBins(obsY,BINS,xmax);
+  // y_rep replicates
+  const REP=8;
+  const datasets=[
+    {type:'bar',label:'observed y',data:obsHist,backgroundColor:'rgba(120,120,120,0.45)',borderColor:'rgba(80,80,80,0.7)',borderWidth:1,order:2},
+    {type:'line',label:'y_rep replicates',data:[],borderColor:'rgba(0,0,0,0)',pointRadius:0,order:1}
+  ];
+  for(let r=0;r<REP;r++){
+    const yrep=[];
+    for(let i=0;i<obsY.length;i++){
+      if(model==='normal')yrep.push(normalSample(yMean,ySd));
+      else yrep.push(nbSample(yMean,aHat));
+    }
+    const h=histBins(yrep,BINS,xmax);
+    datasets.push({type:'line',label:'rep '+(r+1),data:h,borderColor:PPC_COLORS[r]+'cc',backgroundColor:'transparent',borderWidth:1.3,pointRadius:0,tension:0.25,order:0});
+  }
+  ppcChart.data.labels=labels;
+  ppcChart.data.datasets=datasets;
+  ppcChart.update('none');
+  const L=I18n.get();
+  document.getElementById('ppcObsMean').textContent=(L==='zh'?'觀察均值 ':'Obs mean ')+yMean.toFixed(2);
+  document.getElementById('ppcObsVar').textContent =(L==='zh'?'觀察變異 ':'Obs var ')+yVar.toFixed(2);
+  document.getElementById('ppcModel').textContent  =(L==='zh'?'模型：':'Model: ')+(model==='normal'?'Normal (誤設 / misspec.)':'NB (correct)');
+}
+function resampleObs(){
+  const mu=+document.getElementById('sliderPMu').value;
+  const alpha=(+document.getElementById('sliderPAlpha').value)/100;
+  genObs(mu,alpha);renderPPC();
+}
+['sliderPMu','sliderPAlpha'].forEach(id=>document.getElementById(id).addEventListener('input',resampleObs));
+document.getElementById('ppcModelSel').addEventListener('change',renderPPC);
+document.getElementById('ppcResample').addEventListener('click',resampleObs);
+document.addEventListener('langchange',renderPPC);
+resampleObs();
+
+// --- Quiz ---
+const QF={
+  zh:{q1_y:'可信區間直接表述「給定資料與模型，θ 落入此區間的機率」——這是頻率派 CI 無法給予的。',q1_n:'正確答案已標示。',q2_y:'邊際概似內建 Occam-razor 懲罰，使 BF 對先驗範圍敏感；既是合理特性，也常被誤用。',q2_n:'正確答案已標示。',q3_y:'R-hat 只告訴你後驗被抽到了；PPC 才能抓「後驗對應的模型是否本身就錯」——例如把 NB 計數套常態。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'A credible interval directly states "the probability θ lies inside this interval given data and model" — something a frequentist CI cannot say.',q1_n:'Correct answer highlighted.',q2_y:'The marginal likelihood embeds an Occam-razor penalty for spreading prior mass; legitimate as a feature, frequently abused in practice.',q2_n:'Correct answer highlighted.',q3_y:'R-hat only certifies the posterior was sampled; PPC catches the deeper failure of fitting the wrong likelihood — e.g. Normal on counts.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

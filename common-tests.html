@@ -1,0 +1,360 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 5: Common Tests — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html" class="active">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 5 / 17</div>
+<h1 data-zh="常見檢定方法 (Common Tests)" data-en="Common Tests">常見檢定方法</h1>
+<p class="subtitle" data-lang="zh">t / Wilcoxon / χ² / Fisher / ANOVA / Kruskal-Wallis──以及它們各自<em>檢定的虛無假設</em>是什麼。</p>
+<p class="subtitle" data-lang="en">t / Wilcoxon / χ² / Fisher / ANOVA / Kruskal-Wallis — and exactly what null hypothesis each one tests.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Overview ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="選對檢定，從問清楚問題開始" data-en="Choosing the right test starts with the right question">選對檢定 = 問對問題</h2>
+<div data-lang="zh">
+<p>「我該用 t 還是 Wilcoxon？」<em>是錯誤的問法</em>──兩者檢定的<strong>虛無假設不同</strong>：t 檢定的是「兩組母體平均相等」；Wilcoxon (Mann-Whitney U) 檢定的是「兩組分布完全相同 / 隨機優勢相等」，<em>並不是中位數相等</em>。選錯不只是「方法錯」，是<em>問錯問題</em>。</p>
+<p>本章建立三步驟流程：<strong>(1)</strong> 樣本是否配對？<strong>(2)</strong> 比 2 組還是 k 組？<strong>(3)</strong> 參數假設成立嗎？再對應到 t / Welch / paired t / Wilcoxon / Mann-Whitney / χ² / Fisher / ANOVA / Kruskal-Wallis。</p>
+</div>
+<div data-lang="en">
+<p>"Should I use t or Wilcoxon?" is the <em>wrong question</em> — these two tests have <strong>different nulls</strong>: t tests "the two population means are equal"; Wilcoxon / Mann-Whitney U tests "the two distributions are identical / stochastic dominance is zero" — <em>NOT</em> "the medians are equal". Choosing wrong is not a method error — it's a <em>question</em> error.</p>
+<p>This chapter gives a three-step pipeline: <strong>(1)</strong> paired or independent? <strong>(2)</strong> 2 vs k groups? <strong>(3)</strong> parametric assumptions OK? Then map to t / Welch / paired t / Wilcoxon / Mann-Whitney / χ² / Fisher / ANOVA / Kruskal-Wallis.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>R 預設用 Welch 不是 Student：</strong> <code>t.test(x, y)</code> 預設 <code>var.equal = FALSE</code> 即 Welch──不假設變異數相等，幾乎所有實務情境都更穩健，建議保持預設。</span>
+<span data-lang="en"><strong>R defaults to Welch, not Student:</strong> <code>t.test(x, y)</code> uses <code>var.equal = FALSE</code> by default — Welch's t, which does not require equal variances. It is more robust in almost every real setting; keep the default.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、檢定家族總覽" data-en="I. Family of common tests">一、檢定家族總覽</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">📏</div><h4 data-zh="兩組連續：t / Wilcoxon" data-en="Two-group continuous: t / Wilcoxon">兩組連續</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Student's t：</strong>假設常態 + 變異數相等</li>
+<li><strong>Welch's t：</strong>常態但變異數不等 (預設首選)</li>
+<li><strong>Paired t：</strong>配對資料 (tumor-normal 同病人)</li>
+<li><strong>Mann-Whitney U：</strong>對 P(X &gt; Y) ≠ 0.5 敏感──<em>不是</em>中位數檢定</li>
+<li><strong>Wilcoxon signed-rank：</strong>配對非參數版</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Student's t:</strong> normal + equal variances</li>
+<li><strong>Welch's t:</strong> normal but unequal variances (default choice)</li>
+<li><strong>Paired t:</strong> paired data (tumor-normal per patient)</li>
+<li><strong>Mann-Whitney U:</strong> sensitive to P(X &gt; Y) ≠ 0.5 — <em>not</em> a median test</li>
+<li><strong>Wilcoxon signed-rank:</strong> paired nonparametric</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🧮</div><h4 data-zh="計數 / 列聯：χ² / Fisher" data-en="Counts / contingency: χ² / Fisher">計數 / 列聯</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>χ² 獨立性 / goodness-of-fit：</strong>期望次數每格 ≥ 5</li>
+<li><strong>Fisher's exact：</strong>小樣本或邊際稀疏──但偏保守，可用 <em>mid-p</em></li>
+<li><strong>McNemar：</strong>配對二元 (前後 diagnosis)</li>
+<li><strong>Cochran-Mantel-Haenszel：</strong>分層 2×2</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>χ² independence / goodness-of-fit:</strong> expected cells ≥ 5</li>
+<li><strong>Fisher's exact:</strong> small samples / sparse margins — conservative, use <em>mid-p</em> variant if needed</li>
+<li><strong>McNemar:</strong> paired binary (pre/post diagnosis)</li>
+<li><strong>Cochran-Mantel-Haenszel:</strong> stratified 2×2</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">📊</div><h4 data-zh="k 組：ANOVA / Kruskal-Wallis" data-en="k-group: ANOVA / Kruskal-Wallis">k 組比較</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>One-way ANOVA：</strong>等同 <code>lm(y ~ group)</code> 的 F 檢定，要求殘差近常態、組變異齊性</li>
+<li><strong>Welch's ANOVA：</strong>變異數不齊的修正版</li>
+<li><strong>Kruskal-Wallis：</strong>非參數版，用秩</li>
+<li><strong>事後 (post-hoc)：</strong>Tukey HSD (ANOVA)、Dunn (Kruskal)</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>One-way ANOVA:</strong> F-test from <code>lm(y ~ group)</code>; needs near-normal residuals + homogeneity of variance</li>
+<li><strong>Welch's ANOVA:</strong> unequal-variance fix</li>
+<li><strong>Kruskal-Wallis:</strong> nonparametric version on ranks</li>
+<li><strong>Post-hoc:</strong> Tukey HSD (ANOVA), Dunn (Kruskal)</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🧬</div><h4 data-zh="scRNA-seq FindMarkers" data-en="scRNA-seq FindMarkers">scRNA-seq</h4>
+<div data-lang="zh"><p>Seurat <code>FindMarkers</code> 預設用 Wilcoxon──因為單細胞表達分布<em>遠</em>非常態 (尖峰 + 大量零 + 重尾)，且每個 cluster 數千細胞，秩檢定的 power 已足。它檢定的是「兩 cluster 間的<em>分布是否相同</em>」，不是「平均 logFC 是否為 0」──所以 <code>avg_log2FC</code> 是另外算的描述性統計量。</p></div>
+<div data-lang="en"><p>Seurat's <code>FindMarkers</code> defaults to Wilcoxon — single-cell expression is wildly non-normal (spike at 0, heavy tail) and clusters often have thousands of cells, so rank-based power is plenty. It tests "are the two distributions identical?", not "is average log2FC = 0" — <code>avg_log2FC</code> is reported separately as a descriptive statistic.</p></div>
+</div>
+</div>
+</section>
+
+<!-- ===== Section 3: Decision Tree (REQUIRED) ===== -->
+<section class="section">
+<div class="section-label" data-zh="決策樹" data-en="DECISION TREE">決策樹</div>
+<h2 data-zh="二、檢定選擇決策樹" data-en="II. Test selection decision tree">二、檢定選擇決策樹</h2>
+<div class="decision-tree">
+<h4>🌳 <span data-zh="從資料結構到推薦檢定" data-en="From data structure to recommended test">從資料結構到推薦檢定</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>反應變數是<strong>計數 / 類別</strong>嗎？<span class="dt-arrow">→ 是 →</span> 走 Q2；否 (連續) → Q3。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>每格期望次數均 ≥ 5？<span class="dt-arrow">→ 是 →</span> <strong>χ² 獨立性</strong>；否 → <strong>Fisher's exact</strong>。配對 (pre/post) → <strong>McNemar</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>樣本<strong>配對</strong> (同個體、tumor-normal、前後)？<span class="dt-arrow">→ 是 →</span> Q4；否 → Q5。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>差值近常態？<span class="dt-arrow">→ 是 →</span> <strong>Paired t</strong>；否 → <strong>Wilcoxon signed-rank</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>幾組？<strong>2 組</strong> → Q6；<strong>≥ 3 組</strong> → Q7。</div></div>
+<div class="dt-node"><span class="dt-q">Q6:</span><div>常態 + 變異齊？<span class="dt-arrow">→ 是 →</span> <strong>Student's t</strong>；常態但變異不齊 → <strong>Welch's t (R 預設)</strong>；嚴重偏態或極小 n → <strong>Mann-Whitney U</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q7:</span><div>常態 + 變異齊？<span class="dt-arrow">→ 是 →</span> <strong>One-way ANOVA</strong> + Tukey HSD；變異不齊 → <strong>Welch's ANOVA</strong>；非常態 → <strong>Kruskal-Wallis</strong> + Dunn post-hoc。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Response is <strong>count / category</strong>? <span class="dt-arrow">→ Yes →</span> Q2; otherwise (continuous) → Q3.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>All expected cells ≥ 5? <span class="dt-arrow">→ Yes →</span> <strong>χ² independence</strong>; else <strong>Fisher's exact</strong>. Paired (pre/post) → <strong>McNemar</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Are samples <strong>paired</strong> (same subject, tumor-normal, pre/post)? <span class="dt-arrow">→ Yes →</span> Q4; else → Q5.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Differences approximately normal? <span class="dt-arrow">→ Yes →</span> <strong>Paired t</strong>; else <strong>Wilcoxon signed-rank</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>How many groups? <strong>2</strong> → Q6; <strong>≥ 3</strong> → Q7.</div></div>
+<div class="dt-node"><span class="dt-q">Q6:</span><div>Normal + equal variances? <span class="dt-arrow">→ Yes →</span> <strong>Student's t</strong>; normal + unequal → <strong>Welch's t (R default)</strong>; very skewed or tiny n → <strong>Mann-Whitney U</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q7:</span><div>Normal + equal variances? <span class="dt-arrow">→ Yes →</span> <strong>One-way ANOVA</strong> + Tukey HSD; unequal var → <strong>Welch's ANOVA</strong>; non-normal → <strong>Kruskal-Wallis</strong> + Dunn post-hoc.</div></div>
+</div>
+</div>
+</section>
+
+<!-- ===== Section 4: Interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="互動決策樹：選一條路徑就跑檢定" data-en="Interactive: pick a branch, run the test">互動決策樹 + 即時檢定</h2>
+<div data-lang="zh"><p>依下方按鈕選擇你的資料情境，下方會「點亮」推薦檢定，並在 toy dataset 上計算統計量與 p-value，畫出兩組 / 多組的箱型/長條圖。</p></div>
+<div data-lang="en"><p>Click the buttons to describe your scenario. The recommended test lights up, and we compute its statistic and p-value on a built-in toy dataset, with a quick bar / box panel.</p></div>
+<div class="interactive-panel">
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+<button class="dt-btn" data-key="paired" data-val="no"><span data-zh="獨立樣本" data-en="Independent">獨立樣本</span></button>
+<button class="dt-btn" data-key="paired" data-val="yes"><span data-zh="配對樣本" data-en="Paired">配對樣本</span></button>
+<span style="border-left:1px solid var(--c-ink-muted,#888);margin:0 4px"></span>
+<button class="dt-btn" data-key="groups" data-val="2"><span data-zh="2 組" data-en="2 groups">2 組</span></button>
+<button class="dt-btn" data-key="groups" data-val="k"><span data-zh="k ≥ 3 組" data-en="k ≥ 3 groups">k ≥ 3 組</span></button>
+<span style="border-left:1px solid var(--c-ink-muted,#888);margin:0 4px"></span>
+<button class="dt-btn" data-key="param" data-val="yes"><span data-zh="近常態" data-en="≈ normal">近常態</span></button>
+<button class="dt-btn" data-key="param" data-val="no"><span data-zh="非常態 / 偏態" data-en="non-normal">非常態</span></button>
+</div>
+<div class="sim-stats"><span class="sim-stat pass" id="recName">— 推薦檢定 —</span><span class="sim-stat pass" id="recStat">stat = —</span><span class="sim-stat pass" id="recP">p = —</span></div>
+<div class="chart-container"><canvas id="testChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="使用內建玩具資料 (兩組各 12 點 / 多組 3×10)。" data-en="Toy dataset: two groups (12 obs each) or three groups (10 obs each).">內建玩具資料示範。</span></p>
+</div>
+</section>
+
+<!-- ===== Section 5: Pitfalls ===== -->
+<section class="section">
+<div class="section-label" data-zh="陷阱" data-en="PITFALLS">陷阱與誤用</div>
+<h2 data-zh="三、常見誤用" data-en="III. Common misuses">三、常見誤用</h2>
+<div data-lang="zh"><ul style="margin-left:20px;color:var(--c-ink-light);">
+<li><strong>「常態就 t，不常態就 Wilcoxon」是錯的：</strong>兩者檢定的虛無不同 (見上)。若你想比較<em>平均</em>，即使非常態，n 足夠時 Welch t 仍有效；想檢定<em>分布是否相同</em>才用 Wilcoxon。</li>
+<li><strong>對 k 組直接做 k(k−1)/2 個兩兩 t 檢定：</strong>Type I 大幅膨脹 (k=4 → 0.265)。先做<strong>整體檢定 (ANOVA / KW)</strong>，再做<em>受控</em>的 post-hoc (Tukey、Dunn)。</li>
+<li><strong>Fisher's exact 太保守：</strong>對小樣本，傳統 Fisher 偏保守 (true Type I &lt; α)；可用 mid-p Fisher 或 Boschloo 提高 power。</li>
+<li><strong>對單一基因 χ² 套用「期望 &lt; 5」規則卻忘了 20,000 基因的計算可行性：</strong>低 count 基因用 Fisher，trade-off 是運算時間；DESeq2 / edgeR 用 NB GLM 是更好的解。</li>
+<li><strong>scRNA-seq 用 Wilcoxon 後解讀為「平均表達不同」：</strong>Wilcoxon 不檢定平均；要報效果量請報 logFC。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin-left:20px;color:var(--c-ink-light);">
+<li><strong>"Use t if normal, Wilcoxon if not" is wrong:</strong> different nulls. For comparing <em>means</em> with non-normal data and adequate n, Welch's t is still valid. Use Wilcoxon only if you want to test whether the <em>distributions</em> match.</li>
+<li><strong>Running all pairwise t-tests across k groups:</strong> Type I balloons (k=4 → 0.265). Run an <strong>omnibus test (ANOVA / Kruskal-Wallis) first</strong>, then a <em>controlled</em> post-hoc (Tukey, Dunn).</li>
+<li><strong>Fisher's exact is conservative:</strong> for small samples, classic Fisher under-rejects (true Type I &lt; α). Use mid-p Fisher or Boschloo to recover power.</li>
+<li><strong>Applying "expected &lt; 5 → Fisher" gene-by-gene across 20,000 tests:</strong> Fisher is slow at scale; NB GLM (DESeq2 / edgeR) is the right tool for differential expression.</li>
+<li><strong>scRNA-seq Wilcoxon reported as "mean differs":</strong> Wilcoxon does not test means. Report logFC alongside as an effect-size descriptor.</li>
+</ul></div>
+</section>
+
+<!-- ===== Section 6: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：兩組、k 組、列聯與配對" data-en="Code: two-group, k-group, contingency, and paired">實作對照</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r5')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py5')">Python</button></div>
+<div class="code-tab-content active" id="r5"><pre><span class="comment"># --- R --- 常見檢定一覽</span>
+<span class="comment"># 兩組連續</span>
+<span class="func">t.test</span>(x, y)                                  <span class="comment"># Welch (預設)</span>
+<span class="func">t.test</span>(x, y, var.equal=<span class="kw">TRUE</span>)                <span class="comment"># Student</span>
+<span class="func">t.test</span>(x, y, paired=<span class="kw">TRUE</span>)                   <span class="comment"># Paired</span>
+<span class="func">wilcox.test</span>(x, y)                             <span class="comment"># Mann-Whitney U</span>
+<span class="func">wilcox.test</span>(x, y, paired=<span class="kw">TRUE</span>)              <span class="comment"># Wilcoxon signed-rank</span>
+
+<span class="comment"># 列聯 / 計數</span>
+M &lt;- <span class="func">matrix</span>(<span class="func">c</span>(<span class="num">12</span>, <span class="num">8</span>, <span class="num">3</span>, <span class="num">17</span>), <span class="num">2</span>, <span class="num">2</span>)
+<span class="func">chisq.test</span>(M); <span class="func">fisher.test</span>(M); <span class="func">mcnemar.test</span>(M)
+
+<span class="comment"># k 組比較</span>
+aov_fit &lt;- <span class="func">aov</span>(y ~ group, data=d)
+<span class="func">summary</span>(aov_fit); <span class="func">TukeyHSD</span>(aov_fit)         <span class="comment"># ANOVA + post-hoc</span>
+<span class="func">oneway.test</span>(y ~ group, data=d)                <span class="comment"># Welch ANOVA</span>
+<span class="func">kruskal.test</span>(y ~ group, data=d)
+<span class="func">library</span>(FSA); <span class="func">dunnTest</span>(y ~ group, data=d)  <span class="comment"># KW 後 Dunn</span>
+
+<span class="comment"># Tidy output</span>
+<span class="func">library</span>(broom); <span class="func">tidy</span>(<span class="func">t.test</span>(x, y))</pre></div>
+<div class="code-tab-content" id="py5"><pre><span class="comment"># --- Python --- 常見檢定一覽</span>
+<span class="kw">from</span> scipy <span class="kw">import</span> stats
+<span class="kw">import</span> pingouin <span class="kw">as</span> pg, scikit_posthocs <span class="kw">as</span> sp
+
+<span class="comment"># 兩組連續</span>
+stats.ttest_ind(x, y, equal_var=<span class="kw">False</span>)         <span class="comment"># Welch</span>
+stats.ttest_ind(x, y, equal_var=<span class="kw">True</span>)          <span class="comment"># Student</span>
+stats.ttest_rel(x, y)                            <span class="comment"># Paired</span>
+stats.mannwhitneyu(x, y, alternative=<span class="str">"two-sided"</span>)
+stats.wilcoxon(x, y)                             <span class="comment"># signed-rank</span>
+
+<span class="comment"># 列聯 / 計數</span>
+M = [[<span class="num">12</span>, <span class="num">8</span>], [<span class="num">3</span>, <span class="num">17</span>]]
+stats.chi2_contingency(M)
+stats.fisher_exact(M)
+<span class="kw">from</span> statsmodels.stats.contingency_tables <span class="kw">import</span> mcnemar
+mcnemar(M, exact=<span class="kw">True</span>)
+
+<span class="comment"># k 組比較</span>
+stats.f_oneway(g1, g2, g3)                       <span class="comment"># ANOVA</span>
+pg.welch_anova(data=d, dv=<span class="str">"y"</span>, between=<span class="str">"group"</span>)
+stats.kruskal(g1, g2, g3)
+sp.posthoc_dunn(d, val_col=<span class="str">"y"</span>, group_col=<span class="str">"group"</span>)
+pg.pairwise_tukey(data=d, dv=<span class="str">"y"</span>, between=<span class="str">"group"</span>)</pre></div>
+</div>
+</section>
+
+<!-- ===== Section 7: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. 何時應該選 Welch's t 而非 Student's t？</p>
+<p data-lang="en">1. When should you prefer Welch's t over Student's t?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 只在小樣本</span><span data-lang="en">A. Only with small samples</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 幾乎所有實務情境──Welch 對變異數不等更穩健，是 R 的預設</span><span data-lang="en">B. Almost always — Welch is robust to unequal variances; it is R's default</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 只在配對資料</span><span data-lang="en">C. Only with paired data</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 只在資料非常態</span><span data-lang="en">D. Only when data are non-normal</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. Mann-Whitney U 檢定的<strong>正確</strong>虛無假設是？</p>
+<p data-lang="en">2. The <strong>correct</strong> null hypothesis for Mann-Whitney U is?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 兩組的中位數相等</span><span data-lang="en">A. The two medians are equal</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 兩組的平均相等</span><span data-lang="en">B. The two means are equal</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 兩組來自相同分布 (P(X &gt; Y) = 0.5)</span><span data-lang="en">C. Two distributions are equal (P(X &gt; Y) = 0.5)</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 兩組變異數相等</span><span data-lang="en">D. The two variances are equal</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">3. 為何 k 組比較要先做整體 ANOVA / KW，而不是直接做所有兩兩 t 檢定？</p>
+<p data-lang="en">3. Why run an omnibus ANOVA / Kruskal-Wallis before pairwise tests instead of doing all pairwise t-tests directly?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 因為 ANOVA 比較快</span><span data-lang="en">A. ANOVA is faster</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 因為 t 檢定不能用於 k 組</span><span data-lang="en">B. Because t-tests cannot be used with k groups</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 多重兩兩比較會嚴重膨脹 Type I 錯誤；整體檢定 + 受控 post-hoc 維持族系誤差率</span><span data-lang="en">C. Multiple pairwise tests inflate Type I greatly; omnibus + controlled post-hoc preserves family-wise error</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. ANOVA 比 t 更精準</span><span data-lang="en">D. ANOVA is more accurate than t</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="hypothesis-testing.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Prev">← 上一步</span><span class="nav-title">Step 4: Hypothesis Testing</span></a>
+<a href="linear-regression.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 6: Linear Regression</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Helpers
+function mean(a){let s=0;for(const v of a)s+=v;return s/a.length;}
+function variance(a){const m=mean(a);let s=0;for(const v of a)s+=(v-m)*(v-m);return s/(a.length-1);}
+function lgamma(x){let g=0;while(x<7){g-=Math.log(x);x++}let z=1/(x*x);return g+(x-0.5)*Math.log(x)-x+0.5*Math.log(2*Math.PI)+(1/12-z/(360-z*z/1.5))/x;}
+// Regularised incomplete beta for t-CDF
+function betacf(a,b,x){const MAXIT=100,EPS=3e-7,FPMIN=1e-30;const qab=a+b,qap=a+1,qam=a-1;let c=1,d=1-qab*x/qap;if(Math.abs(d)<FPMIN)d=FPMIN;d=1/d;let h=d;for(let m=1;m<=MAXIT;m++){const m2=2*m;let aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN;d=1/d;h*=d*c;aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<EPS)break;}return h;}
+function ibeta(a,b,x){if(x<=0)return 0;if(x>=1)return 1;const bt=Math.exp(lgamma(a+b)-lgamma(a)-lgamma(b)+a*Math.log(x)+b*Math.log(1-x));if(x<(a+1)/(a+b+2))return bt*betacf(a,b,x)/a;return 1-bt*betacf(b,a,1-x)/b;}
+function tcdf(t,df){const x=df/(df+t*t);return t<0? 0.5*ibeta(df/2,0.5,x) : 1-0.5*ibeta(df/2,0.5,x);}
+function pTwoSidedT(t,df){return 2*(1-tcdf(Math.abs(t),df));}
+function pChi2(x,df){// upper-tail for chi-square via gamma series (low precision, OK for demo)
+  let s=0,term=1;for(let k=0;k<100;k++){term=Math.pow(x/2,k)/Math.exp(lgamma(k+df/2+1));s+=Math.pow(x/2,df/2)*Math.exp(-x/2)/Math.exp(lgamma(df/2+k+1))*Math.pow(x/2,k);}
+  // Use simpler: regularised lower incomplete gamma via series. Replace with quick approximation:
+  // Fall back: chi2 = Wilson-Hilferty
+  const z=Math.pow(x/df,1/3)-(1-2/(9*df));return 1-tcdf(z*Math.sqrt(2*df/2),100);// rough z
+}
+// Use Wilson-Hilferty + standard normal CDF for chi-square p
+function normCdf(x){const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;const s=Math.sign(x);x=Math.abs(x)/Math.SQRT2;const t=1/(1+p*x);const y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);return 0.5*(1+s*y);}
+function pChi2WH(x,df){if(x<=0)return 1;const z=(Math.pow(x/df,1/3)-(1-2/(9*df)))/Math.sqrt(2/(9*df));return 1-normCdf(z);}
+
+// Toy datasets
+const G1=[5.1,5.5,4.8,5.7,5.0,5.4,5.2,5.6,5.3,4.9,5.5,5.1];
+const G2=[5.6,5.9,5.4,6.1,5.7,5.8,5.5,6.0,5.7,5.6,5.9,5.8];
+const G3=[6.2,6.5,6.0,6.6,6.3,6.4];
+const choice={paired:'no',groups:'2',param:'yes'};
+
+function recommend(){
+  if(choice.groups==='k'){return choice.param==='yes'?'ANOVA':'Kruskal-Wallis';}
+  if(choice.paired==='yes'){return choice.param==='yes'?"Paired t":"Wilcoxon signed-rank";}
+  return choice.param==='yes'?"Welch's t":"Mann-Whitney U";
+}
+
+const testChart=new Chart(document.getElementById('testChart'),{type:'bar',data:{labels:['Group 1','Group 2','Group 3'],datasets:[{label:'mean ± SD',data:[],backgroundColor:['rgba(26,107,90,0.6)','rgba(192,57,43,0.6)','rgba(230,126,34,0.6)'],borderColor:['rgba(26,107,90,0.95)','rgba(192,57,43,0.95)','rgba(230,126,34,0.95)'],borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'value'}}}}});
+
+function runTest(){
+  const name=recommend();
+  document.getElementById('recName').textContent=(I18n.get()==='zh'?'推薦：':'Recommended: ')+name;
+  let statStr='—',pStr='—';
+  if(choice.groups==='2'){
+    if(choice.paired==='yes'){
+      // paired t on G1 vs G2 (truncate)
+      const m=Math.min(G1.length,G2.length);const diff=[];for(let i=0;i<m;i++)diff.push(G2[i]-G1[i]);
+      const md=mean(diff),sd=Math.sqrt(variance(diff)),t=md/(sd/Math.sqrt(m));const df=m-1;
+      statStr='t = '+t.toFixed(3);pStr='p = '+pTwoSidedT(t,df).toExponential(2);
+    } else if(choice.param==='yes'){
+      // Welch t
+      const m1=mean(G1),m2=mean(G2),v1=variance(G1),v2=variance(G2),n1=G1.length,n2=G2.length;
+      const t=(m1-m2)/Math.sqrt(v1/n1+v2/n2);
+      const df=Math.pow(v1/n1+v2/n2,2)/(Math.pow(v1/n1,2)/(n1-1)+Math.pow(v2/n2,2)/(n2-1));
+      statStr='t = '+t.toFixed(3);pStr='p = '+pTwoSidedT(t,df).toExponential(2);
+    } else {
+      // Mann-Whitney U
+      const all=G1.map(v=>({v,g:1})).concat(G2.map(v=>({v,g:2})));
+      all.sort((a,b)=>a.v-b.v);
+      let r=1,R1=0;for(let i=0;i<all.length;i++){all[i].r=i+1;}
+      for(const o of all)if(o.g===1)R1+=o.r;
+      const n1=G1.length,n2=G2.length;const U=R1-n1*(n1+1)/2;
+      const mu=n1*n2/2,sig=Math.sqrt(n1*n2*(n1+n2+1)/12);const z=(U-mu)/sig;
+      statStr='U = '+U.toFixed(1)+', z = '+z.toFixed(3);pStr='p = '+(2*(1-normCdf(Math.abs(z)))).toExponential(2);
+    }
+    testChart.data.labels=['Group 1','Group 2'];
+    testChart.data.datasets[0].data=[mean(G1),mean(G2)];
+  } else {
+    // k groups: one-way ANOVA or Kruskal-Wallis
+    const all=[G1,G2,G3];const ns=all.map(a=>a.length);const ms=all.map(mean);const N=ns.reduce((a,b)=>a+b);
+    const gm=(ms[0]*ns[0]+ms[1]*ns[1]+ms[2]*ns[2])/N;
+    if(choice.param==='yes'){
+      let ssB=0,ssW=0;for(let i=0;i<3;i++){ssB+=ns[i]*(ms[i]-gm)*(ms[i]-gm);for(const v of all[i])ssW+=(v-ms[i])*(v-ms[i]);}
+      const dfB=2,dfW=N-3,F=(ssB/dfB)/(ssW/dfW);
+      // F-p via 1-Ibeta
+      const x=dfW/(dfW+dfB*F);const p=ibeta(dfW/2,dfB/2,x);
+      statStr='F = '+F.toFixed(3);pStr='p = '+p.toExponential(2);
+    } else {
+      // KW H
+      const tagged=[];all.forEach((arr,i)=>arr.forEach(v=>tagged.push({v,g:i})));
+      tagged.sort((a,b)=>a.v-b.v);tagged.forEach((o,i)=>o.r=i+1);
+      const Rk=[0,0,0];for(const o of tagged)Rk[o.g]+=o.r;
+      let H=0;for(let i=0;i<3;i++)H+=Rk[i]*Rk[i]/ns[i];
+      H=H*12/(N*(N+1))-3*(N+1);
+      statStr='H = '+H.toFixed(3);pStr='p = '+pChi2WH(H,2).toExponential(2);
+    }
+    testChart.data.labels=['Group 1','Group 2','Group 3'];
+    testChart.data.datasets[0].data=[ms[0],ms[1],ms[2]];
+  }
+  document.getElementById('recStat').textContent=statStr;
+  document.getElementById('recP').textContent=pStr;
+  testChart.update('none');
+}
+document.querySelectorAll('.dt-btn').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.key,v=b.dataset.val;choice[k]=v;document.querySelectorAll('.dt-btn').forEach(x=>{if(x.dataset.key===k)x.style.outline='';});b.style.outline='2px solid var(--c-accent, #1a6b5a)';runTest();}));
+document.addEventListener('langchange',runTest);
+runTest();
+
+const QF={
+  zh:{q1_y:'Welch 不要求變異數相等，幾乎在任何情境下都優於 Student；R 預設即為 Welch。',q1_n:'正確答案已標示。',q2_y:'Mann-Whitney U 的虛無是「P(X &gt; Y) = 0.5」(隨機優勢平等)，與「中位數相等」嚴格而言不同──兩分布形狀不同時可發散。',q2_n:'正確答案已標示。',q3_y:'未控制的 m=k(k−1)/2 個兩兩 t 檢定 family-wise α ≈ 1−(1−α)^m，k=4 時已 0.265。整體檢定先把總體錯誤率釘在 α，post-hoc (Tukey/Dunn) 再控制兩兩比較。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'Welch does not assume equal variances and is at least as good as Student in nearly every case; it is R\'s default for good reason.',q1_n:'Correct answer highlighted.',q2_y:'Mann-Whitney U\'s null is "P(X &gt; Y) = 0.5" (no stochastic dominance), which is strictly different from "equal medians" when distribution shapes differ.',q2_n:'Correct answer highlighted.',q3_y:'Uncontrolled m=k(k−1)/2 pairwise t-tests yield family-wise α ≈ 1−(1−α)^m (k=4 → 0.265). An omnibus test fixes total error at α; controlled post-hoc (Tukey/Dunn) handles pairwise comparisons.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

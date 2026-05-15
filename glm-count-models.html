@@ -1,0 +1,395 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 9: GLM — Poisson / NB / Zero-Inflated — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html" class="active">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 9 / 17</div>
+<h1 data-zh="GLM：Poisson / NB / Zero-Inflated" data-en="GLM: Poisson / NB / Zero-Inflated">GLM：Poisson / NB / Zero-Inflated</h1>
+<p class="subtitle" data-lang="zh">廣義線性模型統一了 OLS、logistic、count regression——也是 DESeq2 / edgeR 的數學引擎。</p>
+<p class="subtitle" data-lang="en">The GLM framework unifies OLS, logistic, and count regression — and is the mathematical engine inside DESeq2 / edgeR.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Overview ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="GLM 三件套" data-en="The GLM Trinity">GLM 三件套</h2>
+<div data-lang="zh">
+<p>廣義線性模型（GLM）用三個元件統一了非常多統計模型：</p>
+<ol>
+<li><strong>隨機元件</strong>：Y 屬於指數族（Normal、Bernoulli、Poisson、Gamma、NB…）</li>
+<li><strong>系統元件</strong>：線性預測子 <code>η = Xβ</code></li>
+<li><strong>連結函數 g</strong>：<code>g(E[Y]) = η</code>——把均值映射到實數線</li>
+</ol>
+<p>OLS = Normal + identity；logistic = Bernoulli + logit；count regression = Poisson/NB + log。<strong>本章焦點：計數資料的 GLM</strong>——這正是 RNA-seq 差異表達 (DE) 分析的數學基礎，<code>DESeq2</code> 與 <code>edgeR</code> 對<em>每個基因</em>擬合的就是 NB GLM。</p>
+</div>
+<div data-lang="en">
+<p>The GLM framework unifies many regression models via three components:</p>
+<ol>
+<li><strong>Random component</strong>: Y belongs to an exponential family (Normal, Bernoulli, Poisson, Gamma, NB, …)</li>
+<li><strong>Systematic component</strong>: linear predictor <code>η = Xβ</code></li>
+<li><strong>Link function g</strong>: <code>g(E[Y]) = η</code> — maps the mean onto the real line</li>
+</ol>
+<p>OLS = Normal + identity; logistic = Bernoulli + logit; count regression = Poisson/NB + log. <strong>This chapter's focus: GLMs for count data</strong> — the mathematical foundation of RNA-seq differential expression. <code>DESeq2</code> and <code>edgeR</code> fit a NB GLM <em>per gene</em>.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>關鍵 takeaway：</strong>「為什麼 RNA-seq 不能用 t 檢定？」因為計數資料不是常態。「為什麼 DESeq2 用 NB 不用 Poisson？」因為基因表現的生物與技術變異 → <strong>過度離散 (overdispersion)</strong>，Var/Mean &gt; 1。用 Poisson 擬合過度離散資料 → SE 嚴重低估 → <em>大量假陽性</em>。NB 把 dispersion 當成<strong>第二個參數</strong>修正之。</span>
+<span data-lang="en"><strong>Key takeaway:</strong> Why can't we t-test RNA-seq? Counts aren't Gaussian. Why does DESeq2 use NB instead of Poisson? Because biological + technical variation produces <strong>overdispersion</strong>: Var/Mean &gt; 1. Fitting Poisson to overdispersed data underestimates SE → <em>flood of false positives</em>. NB adds a <strong>second parameter</strong> for dispersion that fixes this.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、計數 GLM 的四個要點" data-en="I. Four Pillars of Count GLMs">一、計數 GLM 四要點</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">📊</div><h4 data-zh="Poisson GLM" data-en="Poisson GLM">Poisson GLM</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><code>log E[Y] = Xβ</code>；Var = E[Y]</li>
+<li>適合：稀有事件、純技術變異、實驗良好控制</li>
+<li><strong>過度離散</strong>診斷：Pearson χ²/df &gt; 1.5 警示</li>
+<li>quasi-Poisson：把 dispersion 當常數放大 SE，但無真實似然</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><code>log E[Y] = Xβ</code>; Var = E[Y]</li>
+<li>Good for: rare events, purely technical variation, controlled designs</li>
+<li><strong>Overdispersion</strong> diagnostic: Pearson χ²/df &gt; 1.5 is a flag</li>
+<li>quasi-Poisson scales SE by a constant; no true likelihood</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">📈</div><h4 data-zh="Negative Binomial GLM" data-en="Negative Binomial GLM">NB GLM</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Var = μ + α·μ²，α = dispersion</li>
+<li>α → 0 退化為 Poisson</li>
+<li><code>MASS::glm.nb</code> 估 α（theta = 1/α）</li>
+<li>DESeq2、edgeR 用 <strong>shrunken</strong> α：跨基因借力</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Var = μ + α·μ², α = dispersion</li>
+<li>α → 0 reduces to Poisson</li>
+<li><code>MASS::glm.nb</code> estimates α (theta = 1/α)</li>
+<li>DESeq2 / edgeR use <strong>shrunken</strong> α — empirical Bayes across genes</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🕳️</div><h4 data-zh="Zero-Inflated / Hurdle" data-en="Zero-Inflated / Hurdle">零膨脹 / Hurdle</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Zero-inflated：兩階段——「結構性零」+ 計數分布</li>
+<li>Hurdle：先二元（0 vs ≥1），再正計數</li>
+<li>單細胞、生態學常見</li>
+<li>但 ZINB vs NB 在低表現基因常難以區分；過度建模反而傷</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Zero-inflated: two-stage — "structural zero" mixture + count</li>
+<li>Hurdle: binary (0 vs ≥1) then positive count</li>
+<li>Common in scRNA-seq, ecology</li>
+<li>ZINB vs NB often indistinguishable for low-expressed genes; overfit hurts</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🧮</div><h4 data-zh="Offset 與 Deviance" data-en="Offsets &amp; Deviance">Offset 與 Deviance</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Offset</strong> = 已知係數 = 1 的協變數，如 <code>log(library_size)</code>、<code>log(person-years)</code></li>
+<li>把「計數」變成「率」而<em>不</em>耗自由度</li>
+<li><strong>Deviance</strong> D = 2(logL<sub>sat</sub> − logL<sub>model</sub>)，類似 RSS</li>
+<li>巢狀模型比較用 D 差 → χ²；非巢狀用 AIC</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Offset</strong> = covariate with fixed coefficient 1, e.g. <code>log(library_size)</code>, <code>log(person-years)</code></li>
+<li>Converts "counts" to "rates" without spending df</li>
+<li><strong>Deviance</strong> D = 2(logL<sub>sat</sub> − logL<sub>model</sub>), the GLM analog of RSS</li>
+<li>Nested models: difference in D ~ χ²; non-nested: AIC</li>
+</ul></div>
+</div>
+</div>
+</section>
+
+<!-- ===== Section 3: Interactive — the centerpiece ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="為什麼 RNA-seq 必須用 NB 不用 Poisson？" data-en="Why RNA-seq needs NB, not Poisson">為什麼必須用 NB？</h2>
+<div data-lang="zh"><p>下方模擬器生成 100 個基因 × 兩組各 5 個樣本的計數資料，<strong>真實</strong>來自 NB(μ=20, α=滑桿值)。對<em>每個基因</em>跑兩個 DE 檢定（兩組均值 vs χ²）：（1）誤把資料當 Poisson；（2）正確用 NB。當 α=0 → 兩者一樣；α 升高 → Poisson 的 χ²/df 飆升，<strong>假陽性率</strong>從 5% 漲到極端值——這就是 DESeq2 / edgeR 存在的原因。</p></div>
+<div data-lang="en"><p>The simulator below generates 100 genes × two groups (n=5 each) of counts <strong>truly from NB(μ=20, α=slider)</strong>. For each gene we run a DE test two ways: (1) assuming Poisson; (2) correctly using NB. When α = 0 the two match; as α grows, Poisson's χ²/df explodes and the <strong>false-positive rate</strong> shoots far past 5% — the entire reason DESeq2 / edgeR exist.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats">
+  <span class="sim-stat pass" id="statPearson">—</span>
+  <span class="sim-stat fail" id="statFPpois">—</span>
+  <span class="sim-stat pass" id="statFPnb">—</span>
+</div>
+<div class="slider-group"><label><span data-zh="真實 dispersion α" data-en="True dispersion α">真實 α</span> <span id="valAlpha">0.30</span></label><input type="range" id="sliderAlpha" min="0" max="100" value="30" step="2"></div>
+<div class="slider-group"><label><span data-zh="平均計數 μ" data-en="Mean count μ">μ</span> <span id="valMu">20</span></label><input type="range" id="sliderMu" min="5" max="100" value="20" step="5"></div>
+<div class="chart-container"><canvas id="glmChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="長條：100 個基因擬合後的 Pearson χ²/df 分布（理想 ≈ 1）；橫線：5% 假陽性閾值。" data-en="Bars: distribution of Pearson χ²/df across 100 genes (ideal ≈ 1); horizontal line: 5% false-positive threshold.">長條：100 基因 Pearson χ²/df</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Bridge to DESeq2 / edgeR ===== -->
+<section class="section">
+<div class="section-label" data-zh="DESeq2 / edgeR 的連結" data-en="BRIDGE TO DESeq2 / edgeR">DESeq2 / edgeR 連結</h2>
+<h2 data-zh="二、本章與 DESeq2 / edgeR 的完整連線" data-en="II. Connection to DESeq2 / edgeR">二、與 DE 工具的完整連線</h2>
+<div data-lang="zh">
+<p>DESeq2 / edgeR 的內部數學完全是本章的東西：</p>
+<ul>
+<li><strong>每個基因</strong>擬合 <code>log μ = Xβ + log(size_factor)</code>——後者就是 <code>log(library_size)</code> 類的 <strong>offset</strong>。</li>
+<li><strong>NB 隨機元件</strong>處理 overdispersion；dispersion α 用 <strong>empirical Bayes</strong> 跨基因收縮（DESeq2 對 mean-dispersion 趨勢線收縮；edgeR 用 quantile-adjusted CML + Bayesian shrinkage）。</li>
+<li><strong>檢定</strong>：DESeq2 預設 Wald；可選 LR。edgeR 經典 quasi-likelihood F-test（<code>glmQLFit</code>）對小樣本更穩。</li>
+<li><strong>邏輯 fold-change</strong>：log<sub>2</sub>FC = β / log(2)。DESeq2 可再做 LFC <strong>shrinkage</strong>（<code>apeglm</code>, <code>ashr</code>）降低低計數基因的雜訊。</li>
+</ul>
+<p>所以本章不只「另一種 GLM」——它<strong>就是</strong> RNA-seq 統計學的引擎室。</p>
+</div>
+<div data-lang="en">
+<p>DESeq2 / edgeR's internal math is exactly what this chapter covers:</p>
+<ul>
+<li><strong>Per gene</strong> they fit <code>log μ = Xβ + log(size_factor)</code> — the size factor is a <code>log(library_size)</code>-style <strong>offset</strong>.</li>
+<li><strong>NB random component</strong> handles overdispersion; dispersion α is <strong>empirically-Bayes shrunken</strong> across genes (DESeq2: shrinkage toward a mean-dispersion trend; edgeR: quantile-adjusted CML + Bayesian shrinkage).</li>
+<li><strong>Tests</strong>: DESeq2 defaults to Wald, optionally LR. edgeR's classical quasi-likelihood F-test (<code>glmQLFit</code>) is more robust at small n.</li>
+<li><strong>Log-fold-change</strong>: log<sub>2</sub>FC = β / log(2). DESeq2 can additionally <strong>shrink LFC</strong> (<code>apeglm</code>, <code>ashr</code>) to tame noise at low counts.</li>
+</ul>
+<p>This chapter is not "another GLM" — it <strong>is</strong> the engine room of RNA-seq statistics.</p>
+</div>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="工具" data-en="Tool">工具</th>
+<th data-zh="模型" data-en="Model">模型</th>
+<th data-zh="特點" data-en="Distinctive">特點</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">DESeq2</td><td data-lang="zh">NB GLM</td><td data-lang="zh">size-factor offset + dispersion shrink + LFC shrink</td><td data-lang="en">DESeq2</td><td data-lang="en">NB GLM</td><td data-lang="en">size factors + dispersion shrink + LFC shrink</td></tr>
+<tr><td data-lang="zh">edgeR (QL)</td><td data-lang="zh">NB QL GLM</td><td data-lang="zh">quasi-likelihood F；小樣本佳</td><td data-lang="en">edgeR (QL)</td><td data-lang="en">NB QL GLM</td><td data-lang="en">quasi-likelihood F; great for small n</td></tr>
+<tr><td data-lang="zh">limma-voom</td><td data-lang="zh">Normal LM + 加權</td><td data-lang="zh">把 NB 轉成加權常態——速度快</td><td data-lang="en">limma-voom</td><td data-lang="en">Weighted Normal LM</td><td data-lang="en">approximates NB via weights — fast</td></tr>
+<tr><td data-lang="zh">DESeq2 + glmGamPoi</td><td data-lang="zh">NB GLM (fast)</td><td data-lang="zh">scRNA-seq 大規模擬合</td><td data-lang="en">DESeq2 + glmGamPoi</td><td data-lang="en">NB GLM (fast)</td><td data-lang="en">large-scale scRNA-seq fitting</td></tr>
+<tr><td data-lang="zh">ZINB-WaVE / NEBULA</td><td data-lang="zh">ZINB / NB mixed</td><td data-lang="zh">scRNA-seq dropout、 donor 隨機效應</td><td data-lang="en">ZINB-WaVE / NEBULA</td><td data-lang="en">ZINB / NB mixed</td><td data-lang="en">scRNA dropout, donor RE</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：Poisson / NB / ZINB" data-en="Code: Poisson / NB / ZINB">實作：Poisson / NB / ZINB</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- 計數 GLM 全套</span>
+<span class="func">library</span>(MASS); <span class="func">library</span>(AER); <span class="func">library</span>(pscl); <span class="func">library</span>(broom)
+
+<span class="comment"># 1) Poisson with offset for rate</span>
+fit_p &lt;- <span class="func">glm</span>(count ~ x + <span class="func">offset</span>(<span class="func">log</span>(size)),
+              family = <span class="func">poisson</span>(link = <span class="str">"log"</span>), data = df)
+
+<span class="comment"># 2) 過度離散診斷</span>
+<span class="func">sum</span>(<span class="func">residuals</span>(fit_p, <span class="str">"pearson"</span>)^<span class="num">2</span>) / fit_p$df.residual    <span class="comment"># χ²/df</span>
+AER::<span class="func">dispersiontest</span>(fit_p)                                  <span class="comment"># 正式檢定</span>
+
+<span class="comment"># 3) 改用 NB GLM</span>
+fit_nb &lt;- MASS::<span class="func">glm.nb</span>(count ~ x + <span class="func">offset</span>(<span class="func">log</span>(size)), data = df)
+fit_nb$theta                                            <span class="comment"># theta = 1/α</span>
+broom::<span class="func">tidy</span>(fit_nb, exponentiate = <span class="kw">TRUE</span>, conf.int = <span class="kw">TRUE</span>)
+
+<span class="comment"># 4) Zero-inflated NB（單細胞、生態學）</span>
+fit_zinb &lt;- pscl::<span class="func">zeroinfl</span>(count ~ x | x, data = df, dist = <span class="str">"negbin"</span>)
+
+<span class="comment"># 5) DESeq2 同樣的概念——對 RNA-seq 計數矩陣</span>
+<span class="comment"># library(DESeq2)</span>
+<span class="comment"># dds &lt;- DESeqDataSetFromMatrix(counts, coldata, ~ condition)</span>
+<span class="comment"># dds &lt;- DESeq(dds)        # estimateSizeFactors + Disp + Wald</span>
+<span class="comment"># results(dds) |&gt; lfcShrink(dds, coef = 2, type = "apeglm")</span></pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">import</span> statsmodels.api <span class="kw">as</span> sm
+<span class="kw">import</span> statsmodels.formula.api <span class="kw">as</span> smf
+<span class="kw">from</span> statsmodels.discrete.count_model <span class="kw">import</span> ZeroInflatedNegativeBinomialP
+
+<span class="comment"># 1) Poisson with offset</span>
+fit_p = smf.<span class="func">glm</span>(<span class="str">"count ~ x"</span>, data=df,
+                 family=sm.families.<span class="func">Poisson</span>(),
+                 offset=np.<span class="func">log</span>(df[<span class="str">"size"</span>])).<span class="func">fit</span>()
+
+<span class="comment"># 2) Overdispersion 診斷</span>
+chi2 = (fit_p.<span class="func">resid_pearson</span>**<span class="num">2</span>).<span class="func">sum</span>()
+chi2 / fit_p.df_resid                          <span class="comment"># &gt; 1.5 警示</span>
+
+<span class="comment"># 3) NB GLM（α 須先估計）</span>
+fit_nb = smf.<span class="func">glm</span>(<span class="str">"count ~ x"</span>, data=df,
+                  family=sm.families.<span class="func">NegativeBinomial</span>(alpha=<span class="num">0.3</span>),
+                  offset=np.<span class="func">log</span>(df[<span class="str">"size"</span>])).<span class="func">fit</span>()
+np.<span class="func">exp</span>(fit_nb.params)                           <span class="comment"># IRR (incidence rate ratio)</span>
+
+<span class="comment"># 4) ZINB</span>
+zinb = ZeroInflatedNegativeBinomialP(y, X, exog_infl=X).<span class="func">fit</span>()
+
+<span class="comment"># 5) 進階：pydeseq2 — DESeq2 的 Python 移植（NB GLM + EB shrinkage）</span>
+<span class="comment"># from pydeseq2.dds import DeseqDataSet; dds.deseq2()</span></pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>① 用 Poisson 跑 RNA-seq → 假陽性洪水。② quasi-Poisson 沒有「正規」似然，因此<strong>無 AIC / LR 檢定</strong>——只能用 deviance F 比較巢狀模型。③ ZINB 套到僅輕度過度離散的資料上——通常 NB 已足，ZINB 多估了一個機率部件反而抖動 SE。④ 不放 <code>log(library_size)</code> offset——估出來的是「絕對計數」而非「率」，跨樣本不可比。</span>
+<span data-lang="en"><strong>Common mistakes:</strong> ① Fitting Poisson to RNA-seq counts → flood of false positives. ② quasi-Poisson has no true likelihood, so <strong>no AIC / LR</strong> — use deviance F for nested comparison. ③ Forcing ZINB on mildly overdispersed data — NB usually suffices; the extra ZI component just adds noise to SE. ④ Omitting <code>log(library_size)</code> offset — you'd be modeling raw counts, not rates, and cross-sample comparison breaks.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 為什麼 Poisson GLM 不適合 RNA-seq？</p>
+<p data-lang="en">1. Why does the Poisson GLM fail on RNA-seq counts?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 計數可能是負數</span><span data-lang="en">A. Counts could be negative</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. Poisson 的 link 是 logit</span><span data-lang="en">B. Poisson's link is logit</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. Poisson 假設 Var = Mean，但 RNA-seq 過度離散；SE 低估 → 假陽性洪水</span><span data-lang="en">C. Poisson assumes Var = Mean, but RNA-seq is overdispersed; SE underestimated → false-positive flood</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Poisson 沒有 MLE</span><span data-lang="en">D. Poisson has no MLE</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 在 <code>glm(count ~ x + offset(log(library_size)), family=poisson)</code> 中加入 offset 是為了什麼？</p>
+<p data-lang="en">2. What does <code>offset(log(library_size))</code> accomplish in <code>glm(..., family=poisson)</code>?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 修正過度離散</span><span data-lang="en">A. Corrects overdispersion</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 把計數變成連續</span><span data-lang="en">B. Makes counts continuous</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 把模型從「計數」改為「率」(count / size)，係數可跨樣本比較，且不消耗自由度</span><span data-lang="en">C. Reframes counts as rates (count / size), making coefficients comparable across samples without spending df</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 加入互動項</span><span data-lang="en">D. Adds an interaction term</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 如何從 Poisson 擬合診斷過度離散？</p>
+<p data-lang="en">3. How do you diagnose overdispersion from a Poisson fit?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 計算 Pearson χ² 殘差平方和除以殘差自由度（≈ 1 為合理；&gt; 1.5 警示）；或 <code>AER::dispersiontest</code></span><span data-lang="en">A. Pearson χ² residuals² summed, divided by residual df (≈ 1 OK; &gt; 1.5 flag); or <code>AER::dispersiontest</code></span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 看 R²</span><span data-lang="en">B. Look at R²</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. QQ plot 殘差是否常態</span><span data-lang="en">C. QQ plot for normality of residuals</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Shapiro-Wilk 檢定</span><span data-lang="en">D. Shapiro-Wilk test</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="logistic-regression.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 8: Logistic Regression</span></a>
+<a href="bayes-priors-posteriors.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 10: Bayes — Priors &amp; Posteriors</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Box-Muller
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+// Sample one NB(mu, alpha) value via Gamma–Poisson mixture (alpha>0)
+function rgamma(shape,scale){
+  // Marsaglia–Tsang for shape>=1; small-shape via boost
+  if(shape<1){const u=Math.random();return rgamma(shape+1,scale)*Math.pow(u,1/shape);}
+  const d=shape-1/3,c=1/Math.sqrt(9*d);
+  while(true){let x,v;do{x=randn();v=1+c*x;}while(v<=0);v=v*v*v;const u=Math.random();
+    if(u<1-0.0331*x*x*x*x)return d*v*scale;
+    if(Math.log(u)<0.5*x*x+d*(1-v+Math.log(v)))return d*v*scale;}
+}
+function rpois(lambda){
+  if(lambda<30){let L=Math.exp(-lambda),k=0,p=1;do{k++;p*=Math.random();}while(p>L);return k-1;}
+  // Normal approx for large lambda
+  return Math.max(0,Math.round(lambda+Math.sqrt(lambda)*randn()));
+}
+function rnb(mu,alpha){
+  if(alpha<=0)return rpois(mu);
+  const shape=1/alpha,scale=mu*alpha;
+  const lam=rgamma(shape,scale);
+  return rpois(lam);
+}
+
+// Welch t-style chi-square approximation via score
+// We approximate per-gene Pearson chi2/df under Poisson assumption
+function pearsonChiPoisson(counts){
+  const n=counts.length;let s=0;for(const c of counts)s+=c;const m=s/n;
+  if(m===0)return 0;let chi=0;for(const c of counts)chi+=Math.pow(c-m,2)/m;return chi/(n-1);
+}
+// Wald-style 2-group DE test under each model
+function poisDEpvalue(g1,g2){
+  // Approximate: log rate diff with SE^2 = 1/sum1 + 1/sum2 (Poisson MLE)
+  const s1=g1.reduce((a,b)=>a+b,0),s2=g2.reduce((a,b)=>a+b,0);
+  if(s1===0||s2===0)return 1;
+  const z=(Math.log(s2/g2.length)-Math.log(s1/g1.length))/Math.sqrt(1/s1+1/s2);
+  return 2*(1-normalCDF(Math.abs(z)));
+}
+function nbDEpvalue(g1,g2,alpha){
+  const m1=g1.reduce((a,b)=>a+b,0)/g1.length,m2=g2.reduce((a,b)=>a+b,0)/g2.length;
+  if(m1===0||m2===0)return 1;
+  // Var of log-mean (delta method): Var(log mean) ≈ (mu + alpha*mu^2)/(n*mu^2) = (1/(n*mu) + alpha/n)
+  const se2=(1/(g1.length*m1)+alpha/g1.length)+(1/(g2.length*m2)+alpha/g2.length);
+  const z=(Math.log(m2)-Math.log(m1))/Math.sqrt(se2);
+  return 2*(1-normalCDF(Math.abs(z)));
+}
+function normalCDF(x){return 0.5*(1+erf(x/Math.SQRT2));}
+function erf(x){const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;const sign=x<0?-1:1;x=Math.abs(x);const t=1/(1+p*x);const y=1-((((a5*t+a4)*t)+a3)*t+a2)*t*a1?0:0; // dummy
+  // proper Abramowitz–Stegun
+  const t2=1/(1+p*x);const y2=1-((((a5*t2+a4)*t2+a3)*t2+a2)*t2+a1)*t2*Math.exp(-x*x);return sign*y2;}
+
+const glmChart=new Chart(document.getElementById('glmChart'),{
+  type:'bar',
+  data:{labels:[],datasets:[
+    {label:'Pearson χ²/df (Poisson fit)',data:[],backgroundColor:'rgba(192,57,43,0.65)'},
+    {label:'expected = 1',type:'line',data:[],borderColor:'rgba(26,107,90,0.85)',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{position:'top'},tooltip:{enabled:false}},
+    scales:{x:{title:{display:true,text:'gene index (sorted by χ²/df)'},ticks:{maxTicksLimit:10}},
+            y:{title:{display:true,text:'χ²/df'},beginAtZero:true,suggestedMax:6}}}
+});
+
+function updateGLM(){
+  const alpha=(+document.getElementById('sliderAlpha').value)/100;
+  const mu=+document.getElementById('sliderMu').value;
+  document.getElementById('valAlpha').textContent=alpha.toFixed(2);
+  document.getElementById('valMu').textContent=mu;
+  const G=100,nPer=5;
+  let chiPois=[],fpPois=0,fpNB=0;
+  for(let g=0;g<G;g++){
+    const g1=[],g2=[];
+    for(let i=0;i<nPer;i++){g1.push(rnb(mu,alpha));g2.push(rnb(mu,alpha));}
+    chiPois.push(pearsonChiPoisson(g1.concat(g2)));
+    if(poisDEpvalue(g1,g2)<0.05)fpPois++;
+    if(nbDEpvalue(g1,g2,alpha)<0.05)fpNB++;
+  }
+  chiPois.sort((a,b)=>a-b);
+  glmChart.data.labels=chiPois.map((_,i)=>i+1);
+  glmChart.data.datasets[0].data=chiPois;
+  glmChart.data.datasets[1].data=[{x:0,y:1},{x:G-1,y:1}];
+  glmChart.update('none');
+
+  const meanChi=chiPois.reduce((a,b)=>a+b,0)/G;
+  const L=I18n.get();
+  const tP=L==='zh'?'平均 Pearson χ²/df ':'mean Pearson χ²/df ';
+  const tFPp=L==='zh'?'Poisson 假陽性率 ':'Poisson FPR ';
+  const tFPn=L==='zh'?'NB 假陽性率 ':'NB FPR ';
+  document.getElementById('statPearson').textContent=tP+meanChi.toFixed(2);
+  const fpEl=document.getElementById('statFPpois');
+  fpEl.textContent=tFPp+(fpPois/G*100).toFixed(0)+'%';
+  fpEl.classList.toggle('fail',fpPois/G>0.08);
+  fpEl.classList.toggle('pass',fpPois/G<=0.08);
+  const nbEl=document.getElementById('statFPnb');
+  nbEl.textContent=tFPn+(fpNB/G*100).toFixed(0)+'%';
+  nbEl.classList.toggle('pass',fpNB/G<=0.10);
+  nbEl.classList.toggle('fail',fpNB/G>0.10);
+}
+['sliderAlpha','sliderMu'].forEach(id=>document.getElementById(id).addEventListener('input',updateGLM));
+document.addEventListener('langchange',updateGLM);
+updateGLM();
+
+const QF={
+  zh:{
+    q1_y:'Poisson 強制 Var=Mean；RNA-seq 因生物與技術變異而 Var ≫ Mean。SE 低估直接導致假陽性大量湧入。',q1_n:'正確答案已標示。過度離散是 RNA-seq 改用 NB 的核心理由。',
+    q2_y:'log(library_size) 作為 offset（係數固定=1），把計數模型轉成「率」模型，跨樣本可比，且不耗自由度。',q2_n:'正確答案已標示。offset 把計數變率。',
+    q3_y:'Pearson χ²/df 是診斷核心；正式檢定可用 AER::dispersiontest 或 lmtest::dispersiontest。',q3_n:'正確答案已標示。χ²/df 是首選診斷。'
+  },
+  en:{
+    q1_y:'Poisson forces Var=Mean; RNA-seq has Var ≫ Mean due to biological + technical variance. Underestimated SE produces false-positive floods.',q1_n:'Correct answer highlighted. Overdispersion is the entire reason NB replaces Poisson.',
+    q2_y:'log(library_size) as an offset (coefficient fixed to 1) reframes counts as rates — comparable across samples, no df cost.',q2_n:'Correct answer highlighted. Offsets turn counts into rates.',
+    q3_y:'Pearson χ²/df is the core diagnostic; AER::dispersiontest formalizes the test.',q3_n:'Correct answer highlighted. χ²/df is the standard check.'
+  }
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.innerHTML=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

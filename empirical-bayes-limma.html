@@ -1,0 +1,344 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 13: Hierarchical & Empirical Bayes (limma shrinkage) — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html" class="active">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 13 / 17</div>
+<h1 data-zh="階層 / 經驗貝氏 (Hierarchical & Empirical Bayes — limma 收縮的動機)" data-en="Hierarchical & Empirical Bayes (the motivation behind limma's shrinkage)">階層 / 經驗貝氏</h1>
+<p class="subtitle" data-lang="zh">為什麼 limma 的 eBayes() 是基因表達分析的金標準？因為每個基因的 MLE 都不穩定——但把幾萬個基因「借力」，整體 MSE 可以大幅下降。</p>
+<p class="subtitle" data-lang="en">Why is limma's eBayes() the gold standard in gene expression analysis? Because each gene's MLE is noisy — but borrowing strength across tens of thousands of genes slashes total MSE.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Why ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="從 James-Stein 到 limma：收縮為何贏" data-en="From James-Stein to limma: why shrinkage wins">從 James-Stein 到 limma：收縮為何贏</h2>
+<div data-lang="zh">
+<p>1961 年 Stein 證明了一個令所有頻率學家震驚的結果：當你要同時估計 k ≥ 3 個獨立常態均值，把每個樣本均值<strong>朝整體中心收縮</strong>得到的估計量，在<em>所有</em>真值組合下、均勻地比 MLE 有更小的均方誤差 (MSE)。MLE 雖然無偏，卻不是最佳——這就是<strong>James-Stein paradox</strong>。</p>
+<p>同樣的邏輯讓 <strong>limma::eBayes()</strong> 成為微陣列／RNA-seq 差異表達分析的事實標準：每個基因 g 的樣本變異 <code>s_g²</code> 在 n=3 時極不穩定，t 統計量會被小變異基因「人為放大」假陽性；eBayes 將 <code>s_g²</code> 朝整體變異趨勢線收縮，得到 <strong>moderated t</strong>——分母更穩定、推論更可靠。</p>
+<p>這一章把<strong>階層模型</strong> (full Bayesian) 與<strong>經驗貝氏 (EB)</strong> 並列：兩者都靠 partial pooling / borrow strength，只是 EB 用資料估計超先驗參數，不傳播超參數的不確定性。</p>
+</div>
+<div data-lang="en">
+<p>In 1961 Stein proved a result that shocked frequentists: when jointly estimating k ≥ 3 independent normal means, <strong>shrinking each sample mean toward the overall centre</strong> uniformly beats the MLE in mean squared error for <em>every</em> true parameter vector. The MLE is unbiased but inadmissible — this is <strong>James-Stein paradox</strong>.</p>
+<p>The same logic makes <strong>limma::eBayes()</strong> the de-facto standard for microarray / RNA-seq differential expression. With n = 3 per group the per-gene variance <code>s_g²</code> is wildly unstable, and t-statistics get artificially inflated for low-variance genes. eBayes shrinks <code>s_g²</code> toward the global mean-variance trend, producing the <strong>moderated t</strong> — a stabler denominator and far more reliable inference.</p>
+<p>This chapter sets <strong>hierarchical (full Bayes)</strong> next to <strong>empirical Bayes (EB)</strong>: both partial-pool by borrowing strength; EB plugs in hyperparameters estimated from the data instead of propagating their uncertainty.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>「我的估計量無偏」不是金科玉律。當你<em>同時</em>估計許多參數時，<strong>偏差換變異</strong>的交換幾乎總是划算——這就是收縮的精神，也是基因組學裡 partial pooling 普及的主因。</span>
+<span data-lang="en"><strong>Core principle:</strong> "my estimator is unbiased" is not a sacred goal. When you estimate <em>many</em> parameters at once, <strong>trading bias for variance</strong> almost always pays — the essence of shrinkage and the reason partial pooling pervades genomics.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、階層、EB、shrinkage 三件事" data-en="I. Hierarchy, Empirical Bayes, Shrinkage">一、階層、EB、shrinkage</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">🏛️</div><h4 data-zh="階層模型 (partial pooling)" data-en="Hierarchical Model (partial pooling)">階層模型 (partial pooling)</h4>
+<div data-lang="zh"><p>每個 g 的參數 <code>θ_g</code> 來自一個共同的母體分布 <code>θ_g ~ N(μ, τ²)</code>，其中 <code>μ, τ²</code> 也有自己的先驗（hyperprior）。後驗 <code>p(θ_g|y)</code> 自動把「單獨估計 y_g」與「整體平均 μ̂」做加權平均——這就是 partial pooling。</p>
+<p>極限：<code>τ → 0</code> 退化為 complete pooling（所有基因一個值）；<code>τ → ∞</code> 退化為 no pooling（每個基因獨立）。<em>「適度收縮」</em>是兩端之間最優。</p></div>
+<div data-lang="en"><p>Each gene's parameter <code>θ_g</code> is drawn from a common population <code>θ_g ~ N(μ, τ²)</code> with its own hyperprior. The posterior <code>p(θ_g|y)</code> automatically takes a weighted average of "fit gene g alone" and "the overall μ̂" — that is partial pooling.</p>
+<p>Limits: <code>τ → 0</code> → complete pooling (one value for all); <code>τ → ∞</code> → no pooling (each gene independent). <em>Moderate shrinkage</em> sits in the middle and is provably better.</p></div>
+</div>
+<div class="card"><div class="card-icon">📐</div><h4 data-zh="James-Stein paradox" data-en="James-Stein paradox">James-Stein paradox</h4>
+<div data-lang="zh"><p>對 <code>X_i ~ N(θ_i, 1)</code>, i=1..k (k ≥ 3)，James-Stein 估計量</p>
+<p style="text-align:center;"><code>θ̂_JS = (1 − (k−2)/Σ X_i²) · X</code></p>
+<p>在<em>任何</em>真值組合下都有比 MLE = X 更低的 MSE。違反直覺處：即使各組獨立、看似無關，「同時收縮」仍嚴格更好。</p>
+<p>這提供了 limma / DESeq2 shrinkage 的理論基礎——只是把「均值朝中心收縮」改為「變異 / log-FC 朝整體趨勢收縮」。</p></div>
+<div data-lang="en"><p>For <code>X_i ~ N(θ_i, 1)</code>, i = 1..k (k ≥ 3), the James-Stein estimator</p>
+<p style="text-align:center;"><code>θ̂_JS = (1 − (k−2)/Σ X_i²) · X</code></p>
+<p>has strictly lower MSE than the MLE for <em>every</em> θ. Counter-intuitive bit: even when the groups are independent and seemingly unrelated, joint shrinkage strictly improves total MSE.</p>
+<p>This is the theoretical backbone for limma / DESeq2 shrinkage — just applied to variances or log-FCs instead of means.</p></div>
+</div>
+<div class="card"><div class="card-icon">🔬</div><h4 data-zh="limma 的 eBayes() 到底做什麼？" data-en="What does limma's eBayes() actually do?">limma 的 eBayes() 到底做什麼？</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>對 expression matrix <code>E[g, sample]</code> 做基因內 OLS，得到 <code>β̂_g</code> 與 <code>s_g²</code>。</li>
+<li><strong>EB shrinkage 變異</strong>：假設 <code>s_g² ~ s₀² · χ²/d₀</code>（scaled inverse-χ²），從所有基因估出 <code>s₀²</code> 與超先驗自由度 <code>d₀</code>。</li>
+<li>後驗變異 = 加權平均：<code>s̃_g² = (d₀ · s₀² + d_g · s_g²) / (d₀ + d_g)</code>。</li>
+<li>moderated t = <code>β̂_g / (s̃_g · sqrt(v_g))</code>，自由度 <code>d₀ + d_g</code> — 比原 t 多出 <code>d₀</code> 度自由度。</li>
+<li>結果：n=3 的實驗也能跑「等效於 n=3+d₀」的穩定 t 檢定。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Per-gene OLS on the expression matrix <code>E[g, sample]</code> gives <code>β̂_g</code> and <code>s_g²</code>.</li>
+<li><strong>EB shrinks the variance</strong>: assume <code>s_g² ~ s₀² · χ²/d₀</code> (scaled inverse-χ²); estimate <code>s₀²</code> and prior df <code>d₀</code> from all genes.</li>
+<li>Posterior variance = weighted average: <code>s̃_g² = (d₀ · s₀² + d_g · s_g²) / (d₀ + d_g)</code>.</li>
+<li>moderated t = <code>β̂_g / (s̃_g · √v_g)</code>, df = <code>d₀ + d_g</code> — i.e. extra <code>d₀</code> degrees of freedom borrowed from the genome.</li>
+<li>Net effect: even an n = 3 experiment behaves like "n = 3 + d₀" for the variance estimator.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🔧</div><h4 data-zh="ashr 與 lfcShrink" data-en="ashr & lfcShrink">ashr 與 lfcShrink</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>ashr (Adaptive Shrinkage)</strong>：直接對<em>效應大小</em> β̂_g 做 EB，先驗用非對稱混合常態，靈活適應稀疏 vs 密集真效應分布。</li>
+<li>DESeq2 的 <code>lfcShrink(type="apeglm")</code>：使用 apeglm 對 NB GLM 的 log-FC 做 EB 收縮，減少低 count 基因的雜訊噴發。</li>
+<li>產出的 LFC 適合做 effect-size 排序、ranked GSEA。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>ashr (Adaptive SHRinkage)</strong>: EB on the <em>effect sizes</em> β̂_g directly, with a flexible asymmetric mixture-normal prior — adapts to sparse vs dense true effects.</li>
+<li>DESeq2's <code>lfcShrink(type="apeglm")</code>: EB shrinks the NB-GLM log-FCs, taming the noisy explosions at low counts.</li>
+<li>Shrunken LFCs are ideal for effect-size ranking and ranked-GSEA.</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>EB ≠ 完整貝氏：</strong>EB 把超先驗參數當作「點估計」插回去，忽略了它本身的不確定性。結果是 EB 的可信區間<em>系統性偏窄</em>——對 SNP n=3 的高雜訊資料尤其明顯。需嚴格 UQ 時改用 hierarchical full Bayes（brms / Stan）。</div>
+<div data-lang="en"><strong>EB ≠ full Bayes.</strong> EB plugs in point estimates of hyperparameters and ignores their uncertainty. Consequence: EB credible intervals are <em>systematically too narrow</em>, especially for very noisy small-n data. For rigorous UQ, switch to hierarchical full Bayes (brms / Stan).</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive Variance Shrinkage ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="eBayes 變異收縮視覺化" data-en="Visualizing eBayes Variance Shrinkage">eBayes 變異收縮視覺化</h2>
+<div data-lang="zh"><p>每個圓點是一個基因的 <code>(均值, 原始變異)</code>。拉動 <code>d₀</code> 滑桿增加先驗自由度，<em>觀察每個 s_g² 被拉向整體中心 s₀²</em>；連動下方的 t-統計量散布——收縮後 t-stat 不再被低變異基因人為放大。</p></div>
+<div data-lang="en"><p>Each dot is a gene at <code>(mean, raw variance)</code>. Push the <code>d₀</code> slider to inject more prior df and <em>watch every s_g² migrate toward the global s₀²</em>. The t-statistic panel updates in real time — moderated t no longer explodes at low-variance genes.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats"><span class="sim-stat pass" id="ebStat1">—</span><span class="sim-stat pass" id="ebStat2">—</span><span class="sim-stat fail" id="ebStat3">—</span></div>
+<div class="slider-group"><label><span data-zh="先驗自由度 d₀" data-en="Prior df d₀">先驗自由度 d₀</span> <span id="valD0">4</span></label><input type="range" id="sliderD0" min="0" max="50" value="4" step="1"></div>
+<div class="slider-group"><label><span data-zh="每組樣本數 n（決定 d_g = n−1）" data-en="n per group (d_g = n−1)">每組 n</span> <span id="valNeb">3</span></label><input type="range" id="sliderNeb" min="2" max="20" value="3" step="1"></div>
+<div style="text-align:center;margin:6px 0;">
+  <button id="ebResample" style="padding:6px 14px;border-radius:6px;border:1px solid #2c5282;background:#2c5282;color:white;cursor:pointer;"><span data-zh="重新生成基因" data-en="Resample genes">重新生成基因</span></button>
+</div>
+<div class="chart-container"><canvas id="ebChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="X: 原始 log(s_g²)；Y: 收縮後 log(s̃_g²)；虛線為 y=x" data-en="X: raw log(s_g²); Y: shrunken log(s̃_g²); dashed = y = x">X: 原始 log(s_g²)；Y: 收縮後 log(s̃_g²)</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Decision Guide ===== -->
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、EB 還是 full Bayes？要收縮什麼？" data-en="II. EB or Full Bayes? Shrink What?">二、EB 還是 full Bayes？</h2>
+
+<div class="decision-tree">
+<h4>🌳 <span data-zh="收縮策略決策樹" data-en="Shrinkage Strategy Flow">收縮策略決策樹</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>n_per_group ≤ 5 的微陣列／RNA-seq？<span class="dt-arrow">→</span> <strong>limma::eBayes()</strong> 或 DESeq2/edgeR 內建變異收縮——幾乎強制。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>關心 log-FC 排序 (GSEA, ranking, visualization)？<span class="dt-arrow">→</span> <code>lfcShrink(type="apeglm")</code> 或 <code>ashr</code>。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>研究設計有強烈分組（多 batch、多組織、多病人）？<span class="dt-arrow">→</span> 階層模型 (brms / lme4)，避免一概收縮到全基因平均。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>需要嚴謹的 UQ（臨床決策、發報告區間）？<span class="dt-arrow">→</span> full Bayesian (Stan)，<strong>不是 EB</strong>——EB 區間偏窄。</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>少量基因 (k &lt; 100)？<span class="dt-arrow">→</span> EB 超參數估計不穩——慎用，或併入弱先驗的 Stan 模型。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>n_per_group ≤ 5 microarray / RNA-seq? <span class="dt-arrow">→</span> <strong>limma::eBayes()</strong> or DESeq2/edgeR's built-in variance shrinkage — virtually mandatory.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Need ranked / displayed log-FCs (GSEA, MA plots)? <span class="dt-arrow">→</span> <code>lfcShrink(type="apeglm")</code> or <code>ashr</code>.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Strong structure in design (batches, tissues, donors)? <span class="dt-arrow">→</span> Hierarchical model (brms / lme4) — avoid pooling toward one global mean.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Rigorous UQ (clinical decision, reported intervals)? <span class="dt-arrow">→</span> Full Bayesian (Stan), <strong>not EB</strong> — EB intervals are too narrow.</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>Few genes (k &lt; 100)? <span class="dt-arrow">→</span> EB hyperparameter estimates are unstable — use cautiously or roll into a Stan model with weak priors.</div></div>
+</div>
+</div>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="場景" data-en="Scenario">場景</th>
+<th data-zh="推薦方法" data-en="Recommended">方法</th>
+<th data-zh="收縮什麼" data-en="What is shrunk">收縮什麼</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">微陣列 DE (n=3 vs 3)</td><td data-lang="zh">limma::eBayes(trend=TRUE)</td><td data-lang="zh">基因內變異 s_g²</td><td data-lang="en">Microarray DE (n=3 vs 3)</td><td data-lang="en">limma::eBayes(trend=TRUE)</td><td data-lang="en">per-gene variance s_g²</td></tr>
+<tr><td data-lang="zh">RNA-seq DE，需要顯示 LFC</td><td data-lang="zh">DESeq2 + lfcShrink(apeglm)</td><td data-lang="zh">log fold-change β̂_g</td><td data-lang="en">RNA-seq DE with LFC display</td><td data-lang="en">DESeq2 + lfcShrink(apeglm)</td><td data-lang="en">log fold-change β̂_g</td></tr>
+<tr><td data-lang="zh">非對稱效應分布 (sparse hits)</td><td data-lang="zh">ashr::ash()</td><td data-lang="zh">β̂_g 與 lfsr (false sign rate)</td><td data-lang="en">Asymmetric / sparse effects</td><td data-lang="en">ashr::ash()</td><td data-lang="en">β̂_g and lfsr</td></tr>
+<tr><td data-lang="zh">多病人 / 多組織階層</td><td data-lang="zh">brms / Stan hierarchical</td><td data-lang="zh">θ_g 朝亞群均值收縮</td><td data-lang="en">Multi-donor / multi-tissue</td><td data-lang="en">brms / Stan hierarchical</td><td data-lang="en">θ_g toward subgroup means</td></tr>
+<tr><td data-lang="zh">少基因 + 臨床決策</td><td data-lang="zh">full Bayes + 弱先驗</td><td data-lang="zh">完整 hyperparameter UQ</td><td data-lang="en">Few genes + clinical decision</td><td data-lang="en">Full Bayes + weak priors</td><td data-lang="en">full hyperparameter UQ</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：limma eBayes、ashr、PyMC 階層" data-en="Code: limma eBayes, ashr, PyMC hierarchical">實作：limma eBayes、ashr、PyMC 階層</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- 經典 limma + ashr</span>
+<span class="func">library</span>(limma); <span class="func">library</span>(ashr)
+
+<span class="comment"># 1) 標準 limma 流程</span>
+design  &lt;- <span class="func">model.matrix</span>(~ group, data=metadata)
+fit     &lt;- <span class="func">lmFit</span>(expr, design)                      <span class="comment"># expr: log2 expression matrix</span>
+contr   &lt;- <span class="func">makeContrasts</span>(groupB - groupA, levels=design)
+fit2    &lt;- <span class="func">contrasts.fit</span>(fit, contr)
+fit2    &lt;- <span class="func">eBayes</span>(fit2, trend=TRUE)                <span class="comment"># 平均-變異 trended prior</span>
+<span class="func">topTable</span>(fit2, coef=<span class="num">1</span>, number=<span class="num">20</span>, adjust=<span class="str">"BH"</span>)
+
+<span class="comment"># 2) 看看 eBayes 學到的超參數</span>
+fit2$df.prior         <span class="comment"># d_0 — 從基因組借來的「額外」自由度</span>
+fit2$s2.prior         <span class="comment"># s_0^2 — 收縮的目標</span>
+<span class="func">plotSA</span>(fit2)          <span class="comment"># 平均 vs 變異 + trend</span>
+
+<span class="comment"># 3) 直接對效應大小做 ashr</span>
+ash_out &lt;- <span class="func">ash</span>(fit2$coefficients[, <span class="num">1</span>], fit2$stdev.unscaled[, <span class="num">1</span>] * <span class="func">sqrt</span>(fit2$s2.post))
+<span class="func">head</span>(ash_out$result[, <span class="func">c</span>(<span class="str">"PosteriorMean"</span>, <span class="str">"lfsr"</span>)])
+
+<span class="comment"># 4) DESeq2 對應：lfcShrink</span>
+<span class="comment"># dds &lt;- DESeqDataSetFromMatrix(...); dds &lt;- DESeq(dds)</span>
+<span class="comment"># res &lt;- lfcShrink(dds, coef="group_B_vs_A", type="apeglm")</span></pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np, statsmodels.api <span class="kw">as</span> sm
+<span class="kw">import</span> pymc <span class="kw">as</span> pm, arviz <span class="kw">as</span> az
+
+<span class="comment"># 1) 手動 EB 變異收縮 (簡化版 limma)</span>
+<span class="comment"># expr: (G genes, N samples), design: (N, p)</span>
+G, N = expr.shape; p = design.shape[<span class="num">1</span>]
+betas, s2 = np.zeros((G, p)), np.zeros(G)
+<span class="kw">for</span> g <span class="kw">in</span> range(G):
+    res = sm.OLS(expr[g], design).fit()
+    betas[g], s2[g] = res.params, res.mse_resid
+d_g = N - p
+<span class="comment"># 估計 d_0, s_0^2 via method-of-moments on log(s2) (Smyth 2004)</span>
+z = np.log(s2)
+e = z - np.log(d_g) + np.special.digamma(d_g/<span class="num">2</span>)        <span class="comment"># adjusted moments</span>
+e_mean = e.mean(); e_var = e.var(ddof=<span class="num">1</span>)
+<span class="comment"># solve for d_0 from trigamma(d_0/2) = e_var - trigamma(d_g/2)</span>
+<span class="kw">from</span> scipy.special <span class="kw">import</span> polygamma
+<span class="kw">from</span> scipy.optimize <span class="kw">import</span> brentq
+target = e_var - polygamma(<span class="num">1</span>, d_g/<span class="num">2</span>)
+d0 = brentq(<span class="kw">lambda</span> d: polygamma(<span class="num">1</span>, d/<span class="num">2</span>) - target, <span class="num">0.01</span>, <span class="num">1000</span>) <span class="kw">if</span> target &gt; <span class="num">0</span> <span class="kw">else</span> np.inf
+s0_2 = np.exp(e_mean + polygamma(<span class="num">0</span>, d0/<span class="num">2</span>) - np.log(d0))
+<span class="comment"># shrunken variance</span>
+s2_post = (d0 * s0_2 + d_g * s2) / (d0 + d_g)
+
+<span class="comment"># 2) 階層 PyMC：θ_g | μ, τ ~ Normal(μ, τ)</span>
+<span class="kw">with</span> pm.Model() <span class="kw">as</span> hb:
+    mu   = pm.Normal(<span class="str">"mu"</span>, <span class="num">0</span>, <span class="num">2</span>)
+    tau  = pm.HalfNormal(<span class="str">"tau"</span>, <span class="num">1</span>)
+    z    = pm.Normal(<span class="str">"z"</span>, <span class="num">0</span>, <span class="num">1</span>, shape=G)
+    theta= pm.Deterministic(<span class="str">"theta"</span>, mu + tau*z)
+    sigma= pm.HalfNormal(<span class="str">"sigma"</span>, <span class="num">1</span>)
+    pm.Normal(<span class="str">"y"</span>, mu=theta[gene_idx], sigma=sigma, observed=y_obs)
+    idata = pm.sample(target_accept=<span class="num">0.95</span>)
+
+<span class="comment"># 3) ashr：透過 rpy2</span>
+<span class="comment"># from rpy2.robjects.packages import importr; ashr = importr("ashr")</span>
+<span class="comment"># res = ashr.ash(betas, ses)</span></pre></div>
+</div>
+
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>n=2 vs 2 直接套 t.test 並 BH 校正——這幾乎一定會生出大量假陽性。<em>原始 s_g 自由度只有 1，分母可以任意小</em>。改用 limma + eBayes 立刻穩定下來，這也是領域共識。</span>
+<span data-lang="en"><strong>Common mistake:</strong> running per-gene <code>t.test</code> + BH on an n=2 vs 2 study. The raw s_g has only 1 df and can be arbitrarily small, inflating t and producing massive false positives. Always use limma + eBayes (or DESeq2 / edgeR) — this is field consensus.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. 既然每個基因的 MLE 無偏，為什麼收縮估計量在 MSE 上仍然更好？</p>
+<p data-lang="en">1. Each gene's MLE is unbiased — why does shrinkage still improve total MSE?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 收縮降低偏差</span><span data-lang="en">A. Shrinkage reduces bias</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 收縮引入小偏差，但變異下降更多，總 MSE 仍降；James-Stein 對 k ≥ 3 證明這恆成立</span><span data-lang="en">B. Shrinkage introduces a small bias but reduces variance more — total MSE drops; James-Stein proves this for k ≥ 3</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 收縮使估計量也無偏</span><span data-lang="en">C. Shrinkage keeps the estimator unbiased</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 收縮不影響 MSE，只是視覺化技巧</span><span data-lang="en">D. Shrinkage does not affect MSE, it is purely cosmetic</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. limma 的 eBayes() 實際上收縮什麼？這帶來什麼好處？</p>
+<p data-lang="en">2. What does limma's eBayes() actually shrink, and what does that buy you?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 收縮 log fold-change 朝零，避免高 LFC 基因</span><span data-lang="en">A. Shrinks log fold-changes toward zero to suppress high-LFC genes</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 收縮 p-value 朝 0.5</span><span data-lang="en">B. Shrinks p-values toward 0.5</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 收縮每個基因的變異 s_g² 朝全基因組趨勢，獲得穩定 moderated t 與 d_0 額外自由度</span><span data-lang="en">C. Shrinks the per-gene variance s_g² toward a global trend, yielding stable moderated t and extra d₀ degrees of freedom</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 收縮 design matrix</span><span data-lang="en">D. Shrinks the design matrix</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 什麼時候 EB 不夠、需要完整階層貝氏？</p>
+<p data-lang="en">3. When is empirical Bayes inadequate compared with full hierarchical Bayes?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 需要正確的不確定性量化（如臨床區間），或基因數小、超參數本身估計不穩時</span><span data-lang="en">A. When proper uncertainty quantification matters (e.g. clinical intervals) or when k is small and the hyperparameter estimates are themselves unstable</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 一律不需要 — EB 永遠等價於 full Bayes</span><span data-lang="en">B. Never — EB is always equivalent to full Bayes</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 只在沒有電腦時</span><span data-lang="en">C. Only when you lack a computer</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 沒人用 full Bayes</span><span data-lang="en">D. Nobody uses full Bayes</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="posterior-summaries.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 12: Posterior Summaries & PPC</span></a>
+<a href="multiple-testing-fdr.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 14: Multiple Testing & FDR</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// --- Variance shrinkage widget ---
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function chi2(df){let s=0;for(let i=0;i<df;i++){const z=randn();s+=z*z;}return s;}
+
+// Generate G genes with raw variance s_g^2 ~ scaled inverse chi-square around s0^2
+const G=200; const TRUE_S0_2=1.0;
+let geneState=[];
+
+function simulateGenes(n){
+  geneState=[];
+  const d_g=n-1;
+  for(let g=0;g<G;g++){
+    // true variance from inv-chi-sq centered s0^2 with low prior df = lots of inter-gene spread
+    const trueVar=TRUE_S0_2 * (1+ 0.6*Math.abs(randn()));  // heterogeneous true variances
+    // observed s_g^2: sample variance ~ trueVar * chi2(d_g)/d_g
+    const s_g2 = trueVar * chi2(d_g) / d_g;
+    // beta_hat for t-stat illustration
+    const beta = (Math.random()<0.05 ? (randn()<0?-1:1)*(1.5+0.5*Math.random()) : 0.1*randn());
+    geneState.push({trueVar, s_g2, beta});
+  }
+}
+
+const ebChart=new Chart(document.getElementById('ebChart'),{type:'scatter',data:{datasets:[
+  {label:'genes (raw vs shrunken log-variance)',data:[],backgroundColor:'rgba(192,57,43,0.45)',borderColor:'rgba(192,57,43,0.7)',pointRadius:3,borderWidth:0.6},
+  {label:'y = x (no shrinkage)',data:[{x:-5,y:-5},{x:5,y:5}],borderColor:'rgba(80,80,80,0.6)',backgroundColor:'transparent',showLine:true,pointRadius:0,borderDash:[5,4],borderWidth:1.2,type:'line'},
+  {label:'shrinkage target log(s₀²)',data:[],borderColor:'rgba(26,107,90,0.85)',backgroundColor:'transparent',showLine:true,pointRadius:0,borderWidth:1.5,type:'line'}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},
+  scales:{x:{title:{display:true,text:'log raw variance log(s_g²)'},min:-4,max:4},y:{title:{display:true,text:'log shrunken log(s̃_g²)'},min:-4,max:4}}}});
+
+function renderEB(){
+  const d0=+document.getElementById('sliderD0').value;
+  const n =+document.getElementById('sliderNeb').value;
+  document.getElementById('valD0').textContent=d0;
+  document.getElementById('valNeb').textContent=n;
+  if(geneState.length===0||geneState._n!==n){simulateGenes(n);geneState._n=n;}
+  const d_g=n-1;
+  // estimate s0^2 ~ mean of s_g^2 (very rough)
+  const meanS2 = geneState.reduce((s,g)=>s+g.s_g2,0)/G;
+  const s0_2 = meanS2;
+  const pts=[];
+  let nSig_raw=0, nSig_mod=0;
+  geneState.forEach(g=>{
+    const s2tilde = (d0*s0_2 + d_g*g.s_g2)/(d0+d_g);
+    pts.push({x:Math.log(g.s_g2), y:Math.log(s2tilde)});
+    const t_raw = g.beta / Math.sqrt(g.s_g2*2/n);
+    const t_mod = g.beta / Math.sqrt(s2tilde*2/n);
+    if(Math.abs(t_raw)>3) nSig_raw++;
+    if(Math.abs(t_mod)>3) nSig_mod++;
+  });
+  ebChart.data.datasets[0].data=pts;
+  ebChart.data.datasets[2].data=[{x:-5,y:Math.log(s0_2)},{x:5,y:Math.log(s0_2)}];
+  ebChart.update('none');
+  const L=I18n.get();
+  document.getElementById('ebStat1').textContent=(L==='zh'?'d₀ + d_g = ':'d₀ + d_g = ')+(d0+d_g);
+  document.getElementById('ebStat2').textContent=(L==='zh'?'log s₀² = ':'log s₀² = ')+Math.log(s0_2).toFixed(2);
+  document.getElementById('ebStat3').textContent=(L==='zh'?'|t|>3: 原 ':'|t|>3: raw ')+nSig_raw+(L==='zh'?' → 收縮後 ':' → moderated ')+nSig_mod;
+}
+['sliderD0','sliderNeb'].forEach(id=>document.getElementById(id).addEventListener('input',renderEB));
+document.getElementById('ebResample').addEventListener('click',()=>{
+  const n=+document.getElementById('sliderNeb').value;simulateGenes(n);geneState._n=n;renderEB();
+});
+document.addEventListener('langchange',renderEB);
+renderEB();
+
+// --- Quiz ---
+const QF={
+  zh:{q1_y:'引入小偏差但讓變異大幅下降，總 MSE 因此降低；James-Stein 在 k ≥ 3 證明這個 bias-variance 交換永遠值得。',q1_n:'正確答案已標示。',q2_y:'eBayes 收縮每個基因的 s_g² 朝全域趨勢，得到 moderated t 與 d₀ 額外自由度——n=3 也能穩定推論。',q2_n:'正確答案已標示。',q3_y:'EB 把超參數當已知，忽略其不確定性；需要嚴謹 UQ 或 k 太小時，full Bayes 比較適合。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'A small bias buys a much bigger variance reduction; James-Stein proves the trade is strictly worth it for k ≥ 3.',q1_n:'Correct answer highlighted.',q2_y:'eBayes shrinks per-gene s_g² toward a global trend, giving a moderated t with d₀ extra df — stabilising inference even at n = 3.',q2_n:'Correct answer highlighted.',q3_y:'EB plugs in hyperparameter point estimates and ignores their uncertainty; switch to full Bayes when UQ matters or k is small.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

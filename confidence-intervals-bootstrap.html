@@ -1,0 +1,277 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 3: Confidence Intervals & Bootstrap — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html" class="active">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 3 / 17</div>
+<h1 data-zh="信賴區間與 Bootstrap (Confidence Intervals & Bootstrap)" data-en="Confidence Intervals & Bootstrap">信賴區間與 Bootstrap</h1>
+<p class="subtitle" data-lang="zh">從 95% CI 的「覆蓋率」詮釋出發，理解 Wald／score／profile／bootstrap 的差別，並用模擬實際看到覆蓋率。</p>
+<p class="subtitle" data-lang="en">Start from the coverage interpretation of 95% CIs, contrast Wald / score / profile / bootstrap, and see coverage rates in simulation.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Overview ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="95% 信賴區間到底是什麼意思？" data-en="What does a 95% confidence interval actually mean?">95% 信賴區間到底是什麼意思？</h2>
+<div data-lang="zh">
+<p>頻率派 CI 的正確詮釋是：「<strong>如果無限重複實驗，依此方法構造的區間中，有 95% 包含真實參數</strong>」。注意主詞是<em>區間</em>而非「真實值」──真實值是<em>固定的</em>，是區間在隨機。「真值落在這個 CI 的機率是 0.95」<strong>是錯誤敘述</strong>──那是貝氏可信區間 (credible interval) 的口吻。</p>
+<p>本章涵蓋：(1) 頻率派覆蓋率詮釋，(2) Wald / score / profile likelihood 三種漸近 CI，(3) 非參數 bootstrap (percentile / basic / studentized / BCa)、參數 bootstrap，(4) CI vs 預測區間 (prediction interval) 的差別。</p>
+</div>
+<div data-lang="en">
+<p>The frequentist reading: "<strong>If we repeated this experiment infinitely, 95% of intervals constructed this way would contain the true parameter</strong>." The subject is the <em>interval</em>, not the true value — the truth is <em>fixed</em>, the interval is random. "The probability that the truth lies in this CI is 0.95" is <strong>wrong</strong> — that statement belongs to a Bayesian credible interval.</p>
+<p>This chapter covers (1) the coverage interpretation, (2) Wald / score / profile-likelihood asymptotic CIs, (3) the nonparametric bootstrap with its variants (percentile, basic, studentized, BCa) and the parametric bootstrap, (4) CI versus prediction interval.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心區別：</strong>CI 描述「<em>參數的位置</em>」的不確定性；prediction interval 描述「<em>下一個觀測值</em>」的不確定性──後者必然更寬，因為要把抽樣變異<em>加上</em>觀測雜訊。</span>
+<span data-lang="en"><strong>Key distinction:</strong> a CI describes uncertainty about a <em>parameter</em>; a prediction interval describes uncertainty about the <em>next observation</em> — necessarily wider because it adds observation noise on top of sampling variance.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、漸近 CI 三大家族" data-en="I. Three families of asymptotic CIs">一、漸近 CI 三大家族</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">📏</div><h4 data-zh="Wald CI" data-en="Wald CI">Wald CI</h4>
+<div data-lang="zh"><p><code>θ̂ ± z_{1−α/2} · SE(θ̂)</code>。最常見、計算最快──但仰賴抽樣分布近似常態，對比例 p 接近 0 或 1、或樣本量極小時非常不準。<strong>修補：</strong>對 OR / log-fold-change 等先做對數變換再取 Wald。</p></div>
+<div data-lang="en"><p><code>θ̂ ± z_{1−α/2} · SE(θ̂)</code>. Most common, fastest — but relies on a normal approximation. Breaks for proportions near 0 or 1, and for tiny samples. <strong>Fix:</strong> for ORs / log-fold-changes, take Wald on the log scale first.</p></div>
+</div>
+<div class="card"><div class="card-icon">📐</div><h4 data-zh="Score / Profile-likelihood CI" data-en="Score / Profile-likelihood CI">Score / Profile</h4>
+<div data-lang="zh"><p><strong>Score CI</strong>：反轉 score 檢定 (Wilson CI 是其特例，比例問題表現極佳)。<strong>Profile likelihood CI</strong>：對 θ 掃描，記錄輪廓概似 ℓ_p(θ)，取 <code>2(ℓ_p(θ̂) − ℓ_p(θ)) ≤ χ²_{1, 0.95}</code> 的範圍。對非線性、不對稱問題遠優於 Wald。<code>confint(glm_fit)</code> 預設就是 profile。</p></div>
+<div data-lang="en"><p><strong>Score CI:</strong> inverts the score test (the Wilson interval is the special case for proportions — far better than Wald near 0/1). <strong>Profile-likelihood CI:</strong> scan θ, take values where <code>2(ℓ_p(θ̂) − ℓ_p(θ)) ≤ χ²_{1, 0.95}</code>. Better than Wald for nonlinear / asymmetric problems. <code>confint(glm_fit)</code> defaults to profile in R.</p></div>
+</div>
+</div>
+
+<h2 style="margin-top:32px" data-zh="二、Bootstrap：當公式失效時的萬用工具" data-en="II. Bootstrap: the swiss army knife when formulas fail">二、Bootstrap：當公式失效時的萬用工具</h2>
+<div data-lang="zh">
+<p><strong>非參數 bootstrap：</strong>從原始資料 (n 筆) 以可放回抽 n 筆，計算統計量 θ̂*；重複 B 次，得到 θ̂* 的「<em>抽樣分布近似</em>」。基於此可造 CI：</p>
+<ul style="margin:8px 0 12px 20px;color:var(--c-ink-light);">
+<li><strong>Percentile：</strong> [θ̂*_{α/2}, θ̂*_{1−α/2}]──最直觀，但對偏態估計有偏。</li>
+<li><strong>Basic (reverse percentile)：</strong> [2θ̂ − θ̂*_{1−α/2}, 2θ̂ − θ̂*_{α/2}]──修正部分偏誤。</li>
+<li><strong>Studentized：</strong>對每次 bootstrap 計算 t* = (θ̂* − θ̂)/SE*，需要 nested bootstrap 估 SE*，但二階準確。</li>
+<li><strong>BCa (bias-corrected and accelerated)：</strong>修正偏誤與不對稱──通常是預設首選。</li>
+</ul>
+<p><strong>參數 bootstrap：</strong>從擬合模型 (e.g. NB(μ̂, α̂)) 生成 pseudo-data，再擬合得到 θ̂*。比非參數版本更銳利──若模型對。</p>
+</div>
+<div data-lang="en">
+<p><strong>Nonparametric bootstrap:</strong> resample n observations with replacement from the original n, compute θ̂*, repeat B times to get an empirical sampling distribution. Then build CIs:</p>
+<ul style="margin:8px 0 12px 20px;color:var(--c-ink-light);">
+<li><strong>Percentile:</strong> [θ̂*_{α/2}, θ̂*_{1−α/2}] — intuitive but biased when θ̂ is skewed.</li>
+<li><strong>Basic (reverse percentile):</strong> [2θ̂ − θ̂*_{1−α/2}, 2θ̂ − θ̂*_{α/2}] — corrects part of the bias.</li>
+<li><strong>Studentized:</strong> use t* = (θ̂* − θ̂)/SE*; needs a nested bootstrap for SE*, but second-order accurate.</li>
+<li><strong>BCa:</strong> bias-corrected and accelerated — usually the recommended default.</li>
+</ul>
+<p><strong>Parametric bootstrap:</strong> draw pseudo-data from the fitted model (e.g. NB(μ̂, α̂)) and refit. Sharper than nonparametric — provided the model is correct.</p>
+</div>
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>Bootstrap 的失效場景：</strong>① <em>極值統計</em> (min, max, 上分位數)──naive bootstrap 漸近偏誤不消失；② <em>依賴資料</em> (時間序列、序列計數)──須用 <em>block bootstrap</em>；③ <em>邊界參數</em> (σ² = 0)──分布退化。</div>
+<div data-lang="en"><strong>Where bootstrap fails:</strong> ① <em>extreme statistics</em> (min, max, upper quantiles) — naive bootstrap is asymptotically biased; ② <em>dependent data</em> (time series, sequences) — use a <em>block bootstrap</em>; ③ <em>boundary parameters</em> (σ² = 0) — the distribution degenerates.</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="100 個 95% CI──頻率派覆蓋率現場演示" data-en="100 simulated 95% CIs: live frequentist coverage demo">100 個 CI 模擬：覆蓋率現場演示</h2>
+<div data-lang="zh"><p>對 N(μ=10, σ=3) 重複抽 100 個樣本 (每次 n 筆)，畫出每次的 95% CI。<strong>紅色</strong>表示該次 CI <em>沒</em>蓋住真值──理論上長期約 5% 會紅。改變 n 觀察區間如何收縮但覆蓋率保持 ≈ 95%。</p></div>
+<div data-lang="en"><p>Draw 100 samples (n each) from N(μ=10, σ=3) and plot each 95% CI. <strong>Red</strong> = the CI missed the truth — about 5% in the long run. Vary n to see how intervals shrink while coverage stays ≈ 95%.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats"><span class="sim-stat pass" id="statCov">— %</span><span class="sim-stat pass" id="statWidth">width ≈ —</span><span class="sim-stat pass" id="statN3">n = 20</span></div>
+<div class="slider-group"><label><span data-zh="樣本數 n" data-en="Sample size n">樣本數 n</span> <span id="valN3">20</span></label><input type="range" id="sliderN3" min="3" max="200" value="20" step="1"></div>
+<div class="chart-container"><canvas id="ciChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="X：100 次模擬；Y：CI 範圍。紅線：真實 μ = 10。" data-en="X: 100 simulations; Y: CI range. Red: true μ = 10.">X：模擬編號；Y：CI 範圍。紅線：真值。</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Comparison ===== -->
+<section class="section">
+<div class="section-label" data-zh="方法比較" data-en="COMPARISON">方法比較</div>
+<h2 data-zh="三、什麼情境用哪種 CI？" data-en="III. Which CI for which situation?">三、CI 方法選擇</h2>
+<table class="comp-table">
+<thead><tr>
+<th data-zh="場景" data-en="Scenario">場景</th>
+<th data-zh="推薦" data-en="Recommended">推薦</th>
+<th data-zh="原因" data-en="Why">原因</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">大樣本均值 / 迴歸係數</td><td data-lang="zh">Wald</td><td data-lang="zh">快速、足夠準</td><td data-lang="en">Large-sample mean / regression β</td><td data-lang="en">Wald</td><td data-lang="en">fast and accurate</td></tr>
+<tr><td data-lang="zh">比例接近 0 或 1</td><td data-lang="zh">Wilson / Clopper-Pearson</td><td data-lang="zh">Wald 嚴重低估邊界區間</td><td data-lang="en">Proportion near 0 or 1</td><td data-lang="en">Wilson / Clopper-Pearson</td><td data-lang="en">Wald collapses at boundaries</td></tr>
+<tr><td data-lang="zh">GLM / 非線性參數</td><td data-lang="zh">Profile likelihood</td><td data-lang="zh">不對稱形狀比 Wald 對</td><td data-lang="en">GLM / nonlinear param</td><td data-lang="en">Profile likelihood</td><td data-lang="en">captures asymmetry</td></tr>
+<tr><td data-lang="zh">複雜統計量 (中位數、GSEA、網路度)</td><td data-lang="zh">BCa bootstrap</td><td data-lang="zh">無需解析式</td><td data-lang="en">Complex statistics (median, GSEA, network metric)</td><td data-lang="en">BCa bootstrap</td><td data-lang="en">no closed-form needed</td></tr>
+<tr><td data-lang="zh">時間序列 / 相關樣本</td><td data-lang="zh">Block bootstrap</td><td data-lang="zh">保留依賴結構</td><td data-lang="en">Time series / correlated</td><td data-lang="en">Block bootstrap</td><td data-lang="en">preserves dependence</td></tr>
+<tr><td data-lang="zh">下一筆觀測值的不確定性</td><td data-lang="zh">Prediction interval</td><td data-lang="zh">CI 只描述參數，不含 ε</td><td data-lang="en">Uncertainty of next obs</td><td data-lang="en">Prediction interval</td><td data-lang="en">CI omits ε</td></tr>
+</tbody></table>
+
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>「p &lt; 0.05，所以 95% CI 不含 0。」<em>邏輯倒置。</em>正確方向是「CI 不含 H₀ 值 → p 在該 α 下 &lt; α」。CI 是<em>更豐富</em>的資訊，效果量+精度一次提供，論文應同時報 CI。</span>
+<span data-lang="en"><strong>Common mistake:</strong> "p &lt; 0.05, so the 95% CI excludes 0." Logic <em>backwards.</em> Correct: "the CI excludes the H₀ value → p &lt; α at that level". A CI is the <em>richer</em> output: effect size + precision in one. Always report CIs alongside p-values.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：CI、bootstrap 與覆蓋率驗證" data-en="Code: CIs, bootstrap, and coverage check">實作：CI 與 bootstrap</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r3')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py3')">Python</button></div>
+<div class="code-tab-content active" id="r3"><pre><span class="comment"># --- R --- CI 三種寫法 + bootstrap</span>
+<span class="comment"># 1) Wald CI (lm / glm)</span>
+fit &lt;- <span class="func">lm</span>(y ~ x, data=d)
+<span class="func">confint</span>(fit)                              <span class="comment"># lm: Wald (基於 t-分布)</span>
+
+<span class="func">library</span>(MASS); g &lt;- <span class="func">glm</span>(y ~ x, family=poisson, data=d)
+<span class="func">confint</span>(g)                                <span class="comment"># glm: profile-likelihood (預設)</span>
+<span class="func">confint.default</span>(g)                        <span class="comment"># glm: Wald (顯式)</span>
+
+<span class="comment"># 2) Proportion CI</span>
+<span class="func">library</span>(binom)
+<span class="func">binom.confint</span>(<span class="num">3</span>, <span class="num">20</span>, methods=<span class="func">c</span>(<span class="str">"asymptotic"</span>, <span class="str">"wilson"</span>, <span class="str">"exact"</span>))
+
+<span class="comment"># 3) Bootstrap CI</span>
+<span class="func">library</span>(boot)
+boot_fn &lt;- <span class="kw">function</span>(data, idx) <span class="func">median</span>(data[idx])
+b &lt;- <span class="func">boot</span>(x, boot_fn, R=<span class="num">2000</span>)
+<span class="func">boot.ci</span>(b, type=<span class="func">c</span>(<span class="str">"perc"</span>, <span class="str">"basic"</span>, <span class="str">"bca"</span>))
+
+<span class="comment"># 4) 覆蓋率驗證 (一次性檢查 CI 是否真正 95%)</span>
+covered &lt;- <span class="func">replicate</span>(<span class="num">2000</span>, {
+  x &lt;- <span class="func">rnorm</span>(<span class="num">20</span>, mean=<span class="num">10</span>, sd=<span class="num">3</span>)
+  ci &lt;- <span class="func">t.test</span>(x)$conf.int
+  ci[<span class="num">1</span>] &lt; <span class="num">10</span> &amp;&amp; ci[<span class="num">2</span>] &gt; <span class="num">10</span>
+})
+<span class="func">mean</span>(covered)                              <span class="comment"># 應接近 0.95</span></pre></div>
+<div class="code-tab-content" id="py3"><pre><span class="comment"># --- Python --- CI 三種寫法 + bootstrap</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">from</span> scipy <span class="kw">import</span> stats
+<span class="kw">import</span> statsmodels.api <span class="kw">as</span> sm
+<span class="kw">from</span> statsmodels.stats.proportion <span class="kw">import</span> proportion_confint
+
+<span class="comment"># 1) Wald CI (OLS / GLM)</span>
+ols = sm.OLS(y, sm.add_constant(X)).<span class="func">fit</span>()
+ols.conf_int(alpha=<span class="num">0.05</span>)                     <span class="comment"># Wald-t</span>
+
+<span class="comment"># 2) Proportion CI</span>
+proportion_confint(<span class="num">3</span>, <span class="num">20</span>, method=<span class="str">"wilson"</span>)
+proportion_confint(<span class="num">3</span>, <span class="num">20</span>, method=<span class="str">"beta"</span>)    <span class="comment"># Clopper-Pearson</span>
+
+<span class="comment"># 3) Bootstrap CI</span>
+res = stats.bootstrap((x,), np.median, n_resamples=<span class="num">2000</span>,
+                       method=<span class="str">"BCa"</span>, confidence_level=<span class="num">0.95</span>)
+res.confidence_interval
+
+<span class="comment"># 4) 覆蓋率驗證</span>
+covered = []
+<span class="kw">for</span> _ <span class="kw">in</span> <span class="func">range</span>(<span class="num">2000</span>):
+    x = np.random.normal(<span class="num">10</span>, <span class="num">3</span>, <span class="num">20</span>)
+    lo, hi = stats.t.interval(<span class="num">0.95</span>, len(x)-<span class="num">1</span>, np.mean(x), stats.sem(x))
+    covered.append(lo &lt; <span class="num">10</span> &lt; hi)
+np.mean(covered)                            <span class="comment"># ≈ 0.95</span></pre></div>
+</div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 對 95% CI [3.1, 5.2] 的<strong>正確</strong>頻率派詮釋是？</p>
+<p data-lang="en">1. The <strong>correct</strong> frequentist reading of a 95% CI [3.1, 5.2] is?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 真值落在 [3.1, 5.2] 的機率是 0.95</span><span data-lang="en">A. The true value lies in [3.1, 5.2] with probability 0.95</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 95% 的觀測值落在 [3.1, 5.2]</span><span data-lang="en">B. 95% of observations fall in [3.1, 5.2]</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 如果重複實驗無限次，依此方法構造的區間中 95% 會包含真值</span><span data-lang="en">C. If we repeated the experiment, 95% of intervals constructed this way would contain the truth</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 95% 的研究人員會同意這個區間</span><span data-lang="en">D. 95% of researchers would agree with this interval</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. BCa 相對於 percentile bootstrap 主要修正什麼？</p>
+<p data-lang="en">2. BCa improves over percentile bootstrap mainly by correcting what?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 計算速度</span><span data-lang="en">A. Computation speed</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 估計量的偏誤與抽樣分布的不對稱性</span><span data-lang="en">B. Bias of the estimator and asymmetry of the sampling distribution</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 樣本獨立性假設</span><span data-lang="en">C. The independence assumption</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 把抽樣方式換成放回 → 不放回</span><span data-lang="en">D. Switching from with-replacement to without-replacement</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">3. 為什麼 naive bootstrap 對「樣本最大值 max(X)」會失效？</p>
+<p data-lang="en">3. Why does naive bootstrap fail for the sample max?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. max 不可微</span><span data-lang="en">A. max is non-differentiable</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 因為 max 的 SE 太小</span><span data-lang="en">B. Because the SE of max is too small</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. Bootstrap 樣本中原始 max 的出現機率 ≈ 1−(1−1/n)ⁿ ≈ 0.632，分布非連續、漸近不收斂到極值分布</span><span data-lang="en">C. The original max appears in each bootstrap sample with prob ≈ 0.632, making the distribution non-continuous and not converging to the right extreme-value law</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Bootstrap 是貝氏方法</span><span data-lang="en">D. Bootstrap is a Bayesian method</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="point-estimation.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Prev">← 上一步</span><span class="nav-title">Step 2: Point Estimation</span></a>
+<a href="hypothesis-testing.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 4: Hypothesis Testing</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+// inverse-t crude via normal+small correction not needed; use z=1.96 with t correction
+function tCrit(df){
+  // approximate two-sided 0.975 t-quantile via Cornish-Fisher; sufficient for visualisation
+  const z=1.959964;return z*(1+(z*z+1)/(4*df));
+}
+
+// Build line-segment dataset for 100 CIs
+const ciChart=new Chart(document.getElementById('ciChart'),{type:'scatter',data:{datasets:[
+  {label:'CI covering μ',data:[],backgroundColor:'rgba(26,107,90,0.6)',pointRadius:0,showLine:false},
+  {label:'CI missing μ',data:[],backgroundColor:'rgba(192,57,43,0.7)',pointRadius:0,showLine:false},
+  {label:'point estimate',data:[],backgroundColor:'rgba(0,0,0,0.6)',pointRadius:2}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'simulation #'},min:0,max:101},y:{title:{display:true,text:'CI'},min:5,max:15}}}});
+
+function updateCI(){
+  const n=+document.getElementById('sliderN3').value;
+  document.getElementById('valN3').textContent=n;
+  document.getElementById('statN3').textContent='n = '+n;
+  const muTrue=10,sigma=3;
+  // We'll draw CIs as small custom canvas overlay via additional datasets of line segments
+  // Implement using "line" datasets per CI
+  ciChart.data.datasets=[];
+  let covered=0,sumW=0;
+  for(let k=0;k<100;k++){
+    let s=0,ss=0;const xs=[];
+    for(let i=0;i<n;i++){const v=muTrue+sigma*randn();xs.push(v);s+=v;ss+=v*v;}
+    const m=s/n;const sd=Math.sqrt((ss-n*m*m)/(n-1));const se=sd/Math.sqrt(n);const t=tCrit(n-1);
+    const lo=m-t*se,hi=m+t*se;sumW+=(hi-lo);
+    const ok=(lo<muTrue&&muTrue<hi);if(ok)covered++;
+    const color=ok?'rgba(26,107,90,0.8)':'rgba(192,57,43,0.9)';
+    ciChart.data.datasets.push({type:'line',data:[{x:k+1,y:lo},{x:k+1,y:hi}],borderColor:color,backgroundColor:color,borderWidth:1.5,pointRadius:0,showLine:true,fill:false});
+    ciChart.data.datasets.push({type:'scatter',data:[{x:k+1,y:m}],backgroundColor:'rgba(0,0,0,0.65)',pointRadius:2,showLine:false});
+  }
+  // truth line
+  ciChart.data.datasets.push({type:'line',data:[{x:0,y:muTrue},{x:101,y:muTrue}],borderColor:'rgba(192,57,43,0.55)',borderDash:[5,4],borderWidth:1.2,pointRadius:0,showLine:true,fill:false,label:'true μ'});
+  ciChart.options.scales.y.min=muTrue-3*sigma/Math.sqrt(2);
+  ciChart.options.scales.y.max=muTrue+3*sigma/Math.sqrt(2);
+  ciChart.update('none');
+  const L=I18n.get();
+  document.getElementById('statCov').textContent=(L==='zh'?'覆蓋率 ':'Coverage ')+covered+' / 100';
+  document.getElementById('statWidth').textContent=(L==='zh'?'平均寬度 ≈ ':'mean width ≈ ')+(sumW/100).toFixed(2);
+}
+document.getElementById('sliderN3').addEventListener('input',updateCI);
+document.addEventListener('langchange',updateCI);
+updateCI();
+
+const QF={
+  zh:{q1_y:'CI 的隨機對象是「區間」，真值固定。重複實驗無限次，依此方法產生的區間中 95% 涵蓋真值──這是頻率派的標準詮釋。',q1_n:'正確答案已標示。',q2_y:'BCa 透過兩個校正常數 (bias-correction z₀ 與 acceleration a) 同時調整偏誤與抽樣分布的不對稱性，二階準確。',q2_n:'正確答案已標示。',q3_y:'極值分布在 bootstrap 重抽下不會收斂到真實極值漸近律，這是 Bickel-Freedman (1981) 給出的經典反例。處理方式：subsampling 或 m-out-of-n bootstrap。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'The random object is the interval, not the parameter. Over repeated experiments, 95% of constructed intervals contain the truth — the frequentist definition.',q1_n:'Correct answer highlighted.',q2_y:'BCa adjusts both bias (z₀) and skewness (acceleration a) of the bootstrap distribution and is second-order accurate.',q2_n:'Correct answer highlighted.',q3_y:'Extreme statistics do not satisfy bootstrap regularity; Bickel-Freedman (1981) is the classical counterexample. Use subsampling or m-out-of-n bootstrap instead.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

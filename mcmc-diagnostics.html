@@ -1,0 +1,380 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 11: MCMC, HMC & Convergence Diagnostics — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html" class="active">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 11 / 17</div>
+<h1 data-zh="MCMC、HMC 與收斂診斷 (MCMC, HMC & Convergence Diagnostics)" data-en="MCMC, HMC & Convergence Diagnostics">MCMC、HMC 與收斂診斷</h1>
+<p class="subtitle" data-lang="zh">為何 Stan / PyMC 用 HMC 而非 Gibbs；如何用 R-hat、ESS 與 divergent transitions 確認後驗真的被取樣到。</p>
+<p class="subtitle" data-lang="en">Why Stan / PyMC reach for HMC instead of Gibbs, and how R-hat, ESS, and divergent transitions verify your posterior is actually being sampled.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Why ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼需要 MCMC？" data-en="Why MCMC?">為什麼需要 MCMC？</h2>
+<div data-lang="zh">
+<p>除了共軛模型，幾乎所有實用的貝氏模型都<strong>沒有封閉解</strong>。<code>p(θ|y) = p(y|θ)p(θ) / p(y)</code> 的分母 <code>p(y) = ∫ p(y|θ)p(θ) dθ</code> 是高維積分；MCMC 不去算這個積分，而是<em>從後驗分布抽樣</em>，用樣本逼近任何後驗摘要。</p>
+<p>三個演算家族：<strong>Metropolis-Hastings (MH)</strong> 是最一般化的提議—接受機制，但對高度相關的後驗收斂極慢；<strong>Gibbs sampling</strong> 在能寫出條件後驗時很方便，但同樣困於相關性；<strong>Hamiltonian Monte Carlo (HMC) / NUTS</strong> 利用對數後驗的梯度沿著等能線移動，在高維與強相關後驗下效率遠勝前兩者——這是 Stan、PyMC、NumPyro 的預設引擎。</p>
+</div>
+<div data-lang="en">
+<p>Outside conjugate models almost every useful Bayesian posterior has <strong>no closed form</strong>. The normalizer <code>p(y) = ∫ p(y|θ)p(θ) dθ</code> in <code>p(θ|y) = p(y|θ)p(θ)/p(y)</code> is a high-dimensional integral. MCMC sidesteps it: instead of integrating, it <em>draws samples</em> from the posterior and approximates any summary by Monte Carlo.</p>
+<p>Three families: <strong>Metropolis-Hastings (MH)</strong> is the most general but mixes painfully slowly under correlated posteriors; <strong>Gibbs</strong> is handy when conditional posteriors are tractable but suffers the same correlation problem; <strong>Hamiltonian Monte Carlo (HMC) / NUTS</strong> uses the gradient of the log-posterior to move along level sets, vastly outperforming the others in high dimensions and strong correlations — the default engine in Stan, PyMC, NumPyro.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>「抽到的樣本看起來像」並不等於「後驗已收斂」。<em>單一鏈條看起來再漂亮，也不能斷言收斂。</em> 至少跑 4 條鏈、檢查 R-hat、ESS、divergences——這是現代貝氏的最低衛生標準。</span>
+<span data-lang="en"><strong>Core principle:</strong> "draws look plausible" is not the same as "the posterior has converged". <em>A single chain that looks fine is not converged.</em> Run ≥4 chains and check R-hat, ESS, and divergences — the minimum hygiene of modern Bayesian inference.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、演算法、收斂與不收斂的徵兆" data-en="I. Algorithms, Convergence, and Warning Signs">一、演算法與收斂徵兆</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">🎰</div><h4 data-zh="Metropolis-Hastings / Gibbs" data-en="Metropolis-Hastings / Gibbs">Metropolis-Hastings / Gibbs</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>MH：從提議分布抽樣，按 <code>min(1, π(θ*)q(θ|θ*) / π(θ)q(θ*|θ))</code> 接受。</li>
+<li>Gibbs：輪流從每個條件後驗 <code>p(θⱼ|θ₋ⱼ, y)</code> 取樣。</li>
+<li>優點：簡單、通用；缺點：當後驗強相關，鏈條像「走步」一樣黏在一條主軸上，ESS 極低。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>MH: propose θ*, accept with prob <code>min(1, π(θ*)q(θ|θ*) / π(θ)q(θ*|θ))</code>.</li>
+<li>Gibbs: cycle through full conditionals <code>p(θⱼ|θ₋ⱼ, y)</code>.</li>
+<li>Pros: simple, general. Cons: under correlated posteriors the chain shuffles along one axis at a crawl — terrible ESS.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">⚡</div><h4 data-zh="HMC 與 NUTS" data-en="HMC and NUTS">HMC 與 NUTS</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>用 <code>∇ log π(θ)</code> 構造哈密頓動力，沿等能線跳遠距、低自相關。</li>
+<li>NUTS (No-U-Turn Sampler) 自動調整路徑長度，免去手動 tuning。</li>
+<li>關鍵代價：必須能微分 — 不接受離散參數（須邊際化）。</li>
+<li>Stan / PyMC / NumPyro 的預設；高維與強相關下唯一可行。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Uses <code>∇ log π(θ)</code> to follow Hamiltonian trajectories — long jumps with low autocorrelation.</li>
+<li>NUTS adapts path length automatically — no manual tuning.</li>
+<li>Catch: needs differentiability — discrete params must be marginalized out.</li>
+<li>The default in Stan / PyMC / NumPyro; the only viable choice in high-D, correlated geometry.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">📏</div><h4 data-zh="收斂診斷三件套" data-en="Three Convergence Checks">收斂診斷三件套</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>R-hat (Ȓ)</strong>：鏈間 vs 鏈內變異比，目標 <code>&lt; 1.01</code>。</li>
+<li><strong>ESS (有效樣本量)</strong>：分 bulk ESS（中段密度）與 tail ESS（5/95 百分位）；至少 <code>&gt; 400</code>。</li>
+<li><strong>Trace plot / rank plot</strong>：肉眼看「毛毛蟲」是否糾纏在一起；rank plot 比 trace 更敏感。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>R-hat (Ȓ)</strong>: between- vs within-chain variance; target <code>&lt; 1.01</code>.</li>
+<li><strong>ESS</strong>: split into bulk ESS (central density) and tail ESS (5/95 percentiles); aim for <code>&gt; 400</code> each.</li>
+<li><strong>Trace / rank plots</strong>: chains should overlap like tangled caterpillars; rank plots are more sensitive than traces.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">💥</div><h4 data-zh="Divergent transitions" data-en="Divergent Transitions">Divergent transitions</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>HMC 在後驗幾何極端尖銳 (funnel) 時，積分誤差爆炸；Stan 會回報「divergent」。</li>
+<li><strong>不能忽略</strong>——它指出某個區域抽樣偏差，後驗摘要可能錯。</li>
+<li>對策：(1) <em>non-centered parametrization</em>（階層模型的關鍵技巧）；(2) 提高 <code>adapt_delta</code> (0.95 / 0.99)；(3) 對正參數取 log。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>When posterior geometry has sharp features (funnels), HMC's integrator blows up and Stan reports a "divergent".</li>
+<li><strong>Never ignore them</strong> — they flag biased exploration of some region.</li>
+<li>Fixes: (1) non-centered parametrization (key trick for hierarchical models); (2) raise <code>adapt_delta</code> to 0.95 or 0.99; (3) log-transform positive params.</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>warmup ≠ burn-in：</strong>HMC 的 warmup 同時做兩件事——讓鏈條離開初始位置，並<em>調整步長與質量矩陣</em>。<em>warmup 樣本不能用</em>；它們不來自固定的提議分布。預設 1000 warmup + 1000 sampling 是常見配置。</div>
+<div data-lang="en"><strong>Warmup ≠ burn-in.</strong> HMC's warmup phase does two jobs — moves the chain away from initialization <em>and</em> tunes step size and mass matrix. <em>Warmup draws must be discarded</em> because they don't come from a fixed proposal. The usual setup is 1000 warmup + 1000 sampling.</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive HMC vs Metropolis ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="HMC vs Metropolis：在強相關後驗上的探索" data-en="HMC vs Metropolis on a Correlated Posterior">HMC vs Metropolis：強相關後驗探索</h2>
+<div data-lang="zh"><p>後驗是一個強相關的二維高斯（ρ≈0.95）。<em>選擇取樣器、調整步長，然後按「Step」</em>——Metropolis 沿主軸蠕動 (高拒絕率)，HMC 沿等能線一跳就跨越長軸。觀察右上角的<strong>接受率</strong>與<strong>ESS 估計</strong>。</p></div>
+<div data-lang="en"><p>The target is a strongly correlated 2-D Gaussian (ρ≈0.95). <em>Pick a sampler, tune step size, hit Step</em> — Metropolis crawls along the major axis with many rejections; HMC traverses the long axis in a single leap. Watch <strong>acceptance rate</strong> and a rough <strong>ESS</strong> in the panel.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats"><span class="sim-stat pass" id="mcStat1">—</span><span class="sim-stat pass" id="mcStat2">—</span><span class="sim-stat fail" id="mcStat3">—</span></div>
+<div class="slider-group">
+  <label><span data-zh="取樣器" data-en="Sampler">取樣器</span></label>
+  <select id="mcSampler" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e0;">
+    <option value="metro">Metropolis (random walk)</option>
+    <option value="hmc" selected>HMC</option>
+  </select>
+</div>
+<div class="slider-group"><label><span data-zh="步長 ε" data-en="Step size ε">步長 ε</span> <span id="valEps">0.25</span></label><input type="range" id="sliderEps" min="5" max="100" value="25" step="1"></div>
+<div class="slider-group"><label><span data-zh="HMC leapfrog 步數 L" data-en="HMC leapfrog steps L">HMC L</span> <span id="valL">20</span></label><input type="range" id="sliderL" min="1" max="60" value="20" step="1"></div>
+<div style="text-align:center;margin:6px 0;">
+  <button id="btnStep" style="padding:6px 14px;margin:0 4px;border-radius:6px;border:1px solid #2c5282;background:#2c5282;color:white;cursor:pointer;">Step ×20</button>
+  <button id="btnRun"  style="padding:6px 14px;margin:0 4px;border-radius:6px;border:1px solid #38a169;background:#38a169;color:white;cursor:pointer;">Run</button>
+  <button id="btnReset" style="padding:6px 14px;margin:0 4px;border-radius:6px;border:1px solid #c53030;background:white;color:#c53030;cursor:pointer;">Reset</button>
+</div>
+<div class="chart-container"><canvas id="mcChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="灰色等高線：目標後驗；紅點：鏈條軌跡" data-en="Grey contours: target posterior; red trail: chain trajectory">灰色等高線：目標後驗；紅點：鏈條軌跡</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Decision Guide ===== -->
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、收到「警告」怎麼辦？" data-en="II. What to Do When You See Warnings">二、收到警告怎麼辦？</h2>
+
+<div class="decision-tree">
+<h4>🌳 <span data-zh="MCMC 警告排除流程" data-en="MCMC Warning Triage">MCMC 警告排除流程</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>R-hat &gt; 1.01？<span class="dt-arrow">→ 是 →</span> 加長 <code>iter</code>（warmup + sampling 各加倍）；若仍不收斂，模型可能不可辨識。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>ESS_bulk &lt; 400？<span class="dt-arrow">→ 是 →</span> 增加抽樣次數；考慮非中心化、log 轉換。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>ESS_tail &lt; ESS_bulk / 2？<span class="dt-arrow">→ 是 →</span> 尾巴混合差——對極端百分位數的推論不可靠，特別小心。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>HMC divergences &gt; 0？<span class="dt-arrow">→ 是 →</span> ① 提高 <code>adapt_delta</code>；② 階層 σ 改 non-centered；③ 對正參數取 log；④ 檢查先驗是否過鬆。</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>達到最大 treedepth？<span class="dt-arrow">→ 是 →</span> 多為效率問題，提高 <code>max_treedepth</code> 即可；但常伴隨 funnel 幾何，宜重參數化。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>R-hat &gt; 1.01? <span class="dt-arrow">→ Yes →</span> double warmup + sampling iterations; if still not converged, model may be non-identifiable.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>ESS_bulk &lt; 400? <span class="dt-arrow">→ Yes →</span> draw more samples; consider non-centered parametrization or log-transforms.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>ESS_tail &lt; ESS_bulk / 2? <span class="dt-arrow">→ Yes →</span> tails mix poorly — extreme quantile inference is unreliable.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Divergent transitions? <span class="dt-arrow">→ Yes →</span> raise <code>adapt_delta</code>; non-center hierarchical σ; log-transform positive params; check overly-wide priors.</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>Max treedepth saturated? <span class="dt-arrow">→ Yes →</span> usually an efficiency issue — bump <code>max_treedepth</code>, but it often co-occurs with funnels; reparameterize.</div></div>
+</div>
+</div>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="症狀" data-en="Symptom">症狀</th>
+<th data-zh="可能原因" data-en="Likely Cause">可能原因</th>
+<th data-zh="處方" data-en="Fix">處方</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">R-hat 一致 &gt; 1.05</td><td data-lang="zh">非識別性 / 先驗矛盾</td><td data-lang="zh">重新建模、加強先驗</td><td data-lang="en">R-hat &gt; 1.05 across params</td><td data-lang="en">Non-identifiable / conflicting priors</td><td data-lang="en">Reparameterize, tighten priors</td></tr>
+<tr><td data-lang="zh">階層模型大量 divergences</td><td data-lang="zh">Neal's funnel</td><td data-lang="zh">non-centered parametrization</td><td data-lang="en">Many divergences in hierarchical model</td><td data-lang="en">Neal's funnel</td><td data-lang="en">Non-centered parametrization</td></tr>
+<tr><td data-lang="zh">ESS 很低、trace 黏成一坨</td><td data-lang="zh">強相關後驗、Metropolis 步長不當</td><td data-lang="zh">改用 HMC / NUTS</td><td data-lang="en">Low ESS, traces glued together</td><td data-lang="en">Highly correlated posterior, bad MH step</td><td data-lang="en">Switch to HMC / NUTS</td></tr>
+<tr><td data-lang="zh">接受率 100% 或 1%</td><td data-lang="zh">步長太小 / 太大</td><td data-lang="zh">調整步長，HMC 用 NUTS 自適應</td><td data-lang="en">Accept rate ~100% or ~1%</td><td data-lang="en">Step size too small / large</td><td data-lang="en">Re-tune; let NUTS auto-adapt</td></tr>
+<tr><td data-lang="zh">兩鏈分到兩個眾數</td><td data-lang="zh">多峰後驗</td><td data-lang="zh">回到模型——是否真該多峰？考慮 mixture 表示</td><td data-lang="en">Two chains in different modes</td><td data-lang="en">Multimodal posterior</td><td data-lang="en">Revisit the model — is multimodality real? Try mixture formulation</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：brms / PyMC + 診斷" data-en="Code: brms / PyMC + Diagnostics">實作：brms / PyMC + 診斷</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- brms 階層模型 + 收斂診斷</span>
+<span class="func">library</span>(brms); <span class="func">library</span>(posterior); <span class="func">library</span>(bayesplot)
+
+fit &lt;- <span class="func">brm</span>(y ~ x + (<span class="num">1</span>|batch), data=df, family=gaussian(),
+           chains=<span class="num">4</span>, iter=<span class="num">2000</span>, warmup=<span class="num">1000</span>, cores=<span class="num">4</span>,
+           control=<span class="func">list</span>(adapt_delta=<span class="num">0.95</span>, max_treedepth=<span class="num">12</span>))
+
+<span class="func">summary</span>(fit)                       <span class="comment"># R-hat 與 bulk/tail ESS 都在表格中</span>
+<span class="func">plot</span>(fit)                          <span class="comment"># trace + 密度</span>
+
+<span class="comment"># 顯式診斷</span>
+draws &lt;- <span class="func">as_draws_df</span>(fit)
+<span class="func">summarise_draws</span>(draws, rhat, ess_bulk, ess_tail)
+
+<span class="comment"># 視覺化</span>
+<span class="func">mcmc_trace</span>(fit, pars=<span class="func">c</span>(<span class="str">"b_x"</span>, <span class="str">"sd_batch__Intercept"</span>))
+<span class="func">mcmc_rank_overlay</span>(fit, pars=<span class="str">"b_x"</span>)   <span class="comment"># rank plot 更敏感</span>
+
+<span class="comment"># Divergence 檢查</span>
+<span class="func">nuts_params</span>(fit) |&gt; <span class="func">subset</span>(Parameter == <span class="str">"divergent__"</span>) |&gt; <span class="func">sum</span>()
+
+<span class="comment"># 非中心化（brms 自動處理；rstan 寫法）</span>
+<span class="comment"># mu_g = mu0 + tau * z_g; z_g ~ N(0, 1)</span></pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python --- PyMC NUTS + ArviZ 診斷</span>
+<span class="kw">import</span> pymc <span class="kw">as</span> pm, arviz <span class="kw">as</span> az, numpy <span class="kw">as</span> np
+
+<span class="kw">with</span> pm.Model() <span class="kw">as</span> m:
+    mu0   = pm.Normal(<span class="str">"mu0"</span>, <span class="num">0</span>, <span class="num">5</span>)
+    tau   = pm.HalfNormal(<span class="str">"tau"</span>, <span class="num">1</span>)
+    z     = pm.Normal(<span class="str">"z"</span>, <span class="num">0</span>, <span class="num">1</span>, shape=n_batch)   <span class="comment"># non-centered</span>
+    mu_g  = pm.Deterministic(<span class="str">"mu_g"</span>, mu0 + tau * z)
+    sigma = pm.HalfNormal(<span class="str">"sigma"</span>, <span class="num">1</span>)
+    pm.Normal(<span class="str">"y"</span>, mu=mu_g[batch_idx], sigma=sigma, observed=y)
+    idata = pm.sample(<span class="num">2000</span>, tune=<span class="num">1000</span>, chains=<span class="num">4</span>,
+                      target_accept=<span class="num">0.95</span>, random_seed=<span class="num">42</span>)
+
+<span class="comment"># 1) 表格診斷</span>
+az.summary(idata, hdi_prob=<span class="num">0.95</span>)            <span class="comment"># r_hat, ess_bulk, ess_tail</span>
+
+<span class="comment"># 2) 視覺化</span>
+az.plot_trace(idata); az.plot_rank(idata)
+az.plot_energy(idata)                          <span class="comment"># Bayesian Fraction of Missing Info</span>
+
+<span class="comment"># 3) Divergences</span>
+n_div = idata.sample_stats.diverging.sum().item()
+print(<span class="str">"divergent transitions:"</span>, n_div)
+
+<span class="comment"># 4) 對問題參數對 pair-plot：看 funnel</span>
+az.plot_pair(idata, var_names=[<span class="str">"tau"</span>, <span class="str">"z"</span>], divergences=True)</pre></div>
+</div>
+
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>「我看 trace 是個漂亮毛毛蟲，所以沒問題。」<em>單鏈 trace 漂亮不代表已收斂</em>——不同鏈可能落入不同眾數。永遠多鏈、永遠看 R-hat 與 ESS。</span>
+<span data-lang="en"><strong>Common mistake:</strong> "The trace looks like a nice fuzzy caterpillar, we're fine." <em>A single tidy trace does not imply convergence</em> — different chains may land in different modes. Always run multiple chains and check R-hat and ESS.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. R-hat (Ȓ) 衡量什麼？可接受的閾值是？</p>
+<p data-lang="en">1. What does R-hat measure, and what threshold is acceptable?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 樣本量；&gt; 1000 可接受</span><span data-lang="en">A. Sample size; &gt; 1000 is OK</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 後驗均值的 SE；&lt; 0.05 可接受</span><span data-lang="en">B. SE of posterior mean; &lt; 0.05 OK</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 鏈間 vs 鏈內變異比；&lt; 1.01 可接受</span><span data-lang="en">C. Ratio of between-chain to within-chain variance; &lt; 1.01 acceptable</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 接受率；&gt; 0.5 可接受</span><span data-lang="en">D. Acceptance rate; &gt; 0.5 acceptable</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">2. Divergent transitions 為什麼重要？如何減少？</p>
+<p data-lang="en">2. Why do divergent transitions matter, and how do you reduce them?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 顯示後驗幾何有問題、可能造成偏差；用 non-centered 與更高 adapt_delta 緩解</span><span data-lang="en">A. They signal pathological posterior geometry — fixes include non-centered parametrization and a higher adapt_delta</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 它們只是雜訊，可忽略</span><span data-lang="en">B. They are mere noise and can be ignored</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 永遠用更多 iter 就能解決</span><span data-lang="en">C. Simply increasing iter always fixes them</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 只發生在 Metropolis，與 HMC 無關</span><span data-lang="en">D. They occur only in Metropolis, not HMC</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. NUTS 在何種情況下顯著優於 Gibbs sampling？</p>
+<p data-lang="en">3. When does NUTS clearly outperform Gibbs sampling?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 參數空間是離散的</span><span data-lang="en">A. The parameter space is discrete</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 高維、後驗強相關或具非線性等高線時</span><span data-lang="en">B. High-dimensional, strongly correlated, or nonlinearly curved posteriors</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 一維 Beta-Binomial 模型</span><span data-lang="en">C. A one-dimensional Beta-Binomial model</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 永遠優於——沒有例外</span><span data-lang="en">D. Always — no exceptions</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="bayes-priors-posteriors.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 10: Bayes Foundations</span></a>
+<a href="posterior-summaries.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 12: Posterior Summaries & PPC</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// --- Sampler demo on correlated 2D Gaussian ---
+// Target: N(0, Σ) with Σ = [[1, rho],[rho, 1]], rho = 0.95
+const RHO=0.95, SIG2=[[1,RHO],[RHO,1]];
+const det=1-RHO*RHO, INV=[[1/det,-RHO/det],[-RHO/det,1/det]];
+function logTarget(x,y){const q=INV[0][0]*x*x + 2*INV[0][1]*x*y + INV[1][1]*y*y;return -0.5*q;}
+function gradLogTarget(x,y){return [-(INV[0][0]*x + INV[0][1]*y), -(INV[1][0]*x + INV[1][1]*y)];}
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+let chain=[{x:2.5,y:-2.5}], accepted=0, total=0;
+
+// build contour ellipse points
+function contourPts(level){
+  const pts=[];const k=Math.sqrt(-2*Math.log(level));
+  // ellipse: Σ^(1/2)·(cos t, sin t)·k; Σ^(1/2) for [[1,r],[r,1]] = [[a,b],[b,a]], a=(sqrt(1+r)+sqrt(1-r))/2, b=(sqrt(1+r)-sqrt(1-r))/2
+  const a=(Math.sqrt(1+RHO)+Math.sqrt(1-RHO))/2;
+  const b=(Math.sqrt(1+RHO)-Math.sqrt(1-RHO))/2;
+  for(let i=0;i<=80;i++){const t=2*Math.PI*i/80;const c=Math.cos(t)*k,s=Math.sin(t)*k;pts.push({x:a*c+b*s,y:b*c+a*s});}
+  return pts;
+}
+
+const mcChart=new Chart(document.getElementById('mcChart'),{type:'scatter',data:{datasets:[
+  {label:'contour 1σ',data:contourPts(0.6),borderColor:'rgba(120,120,120,0.55)',backgroundColor:'transparent',showLine:true,pointRadius:0,borderWidth:1.2},
+  {label:'contour 2σ',data:contourPts(0.2),borderColor:'rgba(120,120,120,0.4)',backgroundColor:'transparent',showLine:true,pointRadius:0,borderWidth:1.2,borderDash:[4,4]},
+  {label:'chain',data:[chain[0]],borderColor:'rgba(192,57,43,0.85)',backgroundColor:'rgba(192,57,43,0.6)',showLine:true,pointRadius:1.8,borderWidth:1.2,tension:0}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{min:-4,max:4,title:{display:true,text:'θ₁'}},y:{min:-4,max:4,title:{display:true,text:'θ₂'}}}}});
+
+function metroStep(eps){
+  const cur=chain[chain.length-1];
+  const prop={x:cur.x+eps*randn(),y:cur.y+eps*randn()};
+  const a=Math.exp(logTarget(prop.x,prop.y)-logTarget(cur.x,cur.y));
+  total++;
+  if(Math.random()<a){accepted++;chain.push(prop);}
+  else chain.push(cur);
+}
+function hmcStep(eps,L){
+  const cur=chain[chain.length-1];
+  let x=cur.x,y=cur.y;
+  let px=randn(),py=randn();
+  const H0=-logTarget(x,y)+0.5*(px*px+py*py);
+  // leapfrog
+  let g=gradLogTarget(x,y);
+  px+=0.5*eps*g[0];py+=0.5*eps*g[1];
+  for(let i=0;i<L;i++){
+    x+=eps*px;y+=eps*py;
+    g=gradLogTarget(x,y);
+    if(i<L-1){px+=eps*g[0];py+=eps*g[1];}
+    else{px+=0.5*eps*g[0];py+=0.5*eps*g[1];}
+  }
+  const H1=-logTarget(x,y)+0.5*(px*px+py*py);
+  const a=Math.exp(H0-H1);
+  total++;
+  if(Math.random()<a&&isFinite(H1)){accepted++;chain.push({x,y});}
+  else chain.push(cur);
+}
+function doStep(){
+  const eps=(+document.getElementById('sliderEps').value)/100;
+  const L=+document.getElementById('sliderL').value;
+  const samp=document.getElementById('mcSampler').value;
+  for(let i=0;i<20;i++){samp==='hmc'?hmcStep(eps,L):metroStep(eps);}
+  // keep chain bounded length for display
+  if(chain.length>800)chain=chain.slice(-800);
+  mcChart.data.datasets[2].data=chain;
+  mcChart.update('none');
+  updateMCStats();
+}
+function updateMCStats(){
+  const lang=I18n.get();
+  const accRate=total?(accepted/total):0;
+  // approximate ESS by 1/(1+2*sum(rho_k)) on x-coord — quick & dirty
+  const xs=chain.map(p=>p.x);
+  const n=xs.length, m=xs.reduce((s,v)=>s+v,0)/n;
+  const v=xs.reduce((s,x)=>s+(x-m)*(x-m),0)/n;
+  let sumRho=0;
+  for(let k=1;k<Math.min(50,n-1);k++){
+    let c=0;for(let i=0;i<n-k;i++)c+=(xs[i]-m)*(xs[i+k]-m);c/=((n-k)*v||1);if(c<0.05)break;sumRho+=c;
+  }
+  const ess=Math.round(n/(1+2*sumRho));
+  document.getElementById('mcStat1').textContent=(lang==='zh'?'樣本 n ':'Samples n ')+n;
+  document.getElementById('mcStat2').textContent=(lang==='zh'?'接受率 ':'Accept rate ')+accRate.toFixed(2);
+  document.getElementById('mcStat3').textContent=(lang==='zh'?'估計 ESS ':'Est. ESS ')+ess;
+}
+['sliderEps','sliderL'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{
+  document.getElementById('valEps').textContent=((+document.getElementById('sliderEps').value)/100).toFixed(2);
+  document.getElementById('valL').textContent=document.getElementById('sliderL').value;
+}));
+document.getElementById('btnStep').addEventListener('click',doStep);
+let runTimer=null;
+document.getElementById('btnRun').addEventListener('click',()=>{
+  if(runTimer){clearInterval(runTimer);runTimer=null;document.getElementById('btnRun').textContent='Run';}
+  else{runTimer=setInterval(doStep,80);document.getElementById('btnRun').textContent='Stop';}
+});
+document.getElementById('btnReset').addEventListener('click',()=>{
+  if(runTimer){clearInterval(runTimer);runTimer=null;document.getElementById('btnRun').textContent='Run';}
+  chain=[{x:2.5,y:-2.5}];accepted=0;total=0;
+  mcChart.data.datasets[2].data=chain;mcChart.update('none');updateMCStats();
+});
+document.addEventListener('langchange',updateMCStats);
+updateMCStats();
+
+// --- Quiz ---
+const QF={
+  zh:{q1_y:'R-hat 把鏈間變異與鏈內變異相比；接近 1（一般 < 1.01）才表示混合良好。',q1_n:'正確答案已標示。',q2_y:'Divergences 顯示積分誤差爆炸，後驗某些區域取樣偏差；non-centered 與更高 adapt_delta 是首選對策。',q2_n:'正確答案已標示。',q3_y:'高維與強相關／彎曲後驗下，HMC 的梯度資訊讓步長遠勝 Gibbs 的逐軸更新。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'R-hat compares between- vs within-chain variance; values near 1 (commonly <1.01) indicate mixing.',q1_n:'Correct answer highlighted.',q2_y:'Divergences flag integration blow-ups and biased exploration; non-centered parametrization plus a higher adapt_delta is the canonical fix.',q2_n:'Correct answer highlighted.',q3_y:'In high-D, strongly correlated, or curved geometry, HMC\'s gradient-guided steps dwarf Gibbs\'s axis-by-axis crawl.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

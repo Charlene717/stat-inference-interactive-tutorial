@@ -1,0 +1,329 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 8: Logistic Regression &amp; Odds Ratios — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html" class="active">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 8 / 17</div>
+<h1 data-zh="Logistic 迴歸與勝算比" data-en="Logistic Regression &amp; Odds Ratios">Logistic 迴歸與勝算比</h1>
+<p class="subtitle" data-lang="zh">病例—對照、預測生物標記、分類器——所有二元結果分析的基石。但 OR ≠ RR，是看似簡單實則陷阱重重的模型。</p>
+<p class="subtitle" data-lang="en">Case–control studies, predictive biomarkers, classifier evaluation — the foundation of binary outcome analysis. Yet OR ≠ RR, and the pitfalls are many.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Overview ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼要 logit link？" data-en="Why the logit link?">為什麼要 logit link？</h2>
+<div data-lang="zh">
+<p>二元結果（patient / control、突變 / 野生型、響應 / 無響應）若直接 OLS 擬合，預測值可能 &lt; 0 或 &gt; 1——既不合理也違反同質變異。Logistic 迴歸用 <strong>logit link</strong> 把 (0, 1) 機率對映到 (−∞, ∞)：</p>
+<p style="text-align:center;font-size:1.1rem;"><code>logit(p) = log(p/(1−p)) = β₀ + β₁x₁ + ... + β<sub>k</sub>x<sub>k</sub></code></p>
+<p>係數 β 是<strong>對數勝算 (log-odds)</strong>，<code>exp(β)</code> 是<strong>勝算比 (odds ratio, OR)</strong>。MLE 透過 <strong>IRLS</strong>（迭代加權最小平方）求解；推論可用 Wald、Score、Likelihood Ratio 三種檢定。</p>
+</div>
+<div data-lang="en">
+<p>Binary outcomes (case/control, mutant/WT, responder/non) cannot be sensibly fit by OLS — predicted values escape (0, 1) and homoscedasticity fails. Logistic regression uses the <strong>logit link</strong> to map probabilities in (0, 1) to the real line:</p>
+<p style="text-align:center;font-size:1.1rem;"><code>logit(p) = log(p/(1−p)) = β₀ + β₁x₁ + ... + β<sub>k</sub>x<sub>k</sub></code></p>
+<p>The β coefficients are <strong>log-odds</strong>; <code>exp(β)</code> is the <strong>odds ratio (OR)</strong>. MLE proceeds by <strong>IRLS</strong> (iteratively reweighted least squares). Inference comes from Wald, Score, or Likelihood Ratio tests.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心警告：OR ≠ RR。</strong>勝算比與相對風險只有在「事件罕見」（baseline p &lt; ~10%）時才近似相等。在常見事件（response 率 40%）OR 會嚴重<strong>誇大</strong>真正的 RR。要報告 RR，就用 <strong>log-binomial</strong> 或 <strong>Poisson + robust SE</strong>，不要硬把 OR 當 RR 講。</span>
+<span data-lang="en"><strong>Core warning: OR ≠ RR.</strong> Odds ratio approximates relative risk only when events are rare (baseline p &lt; ~10%). For common outcomes (response 40%), OR <strong>overstates</strong> the true RR. To report RR, use <strong>log-binomial</strong> or <strong>Poisson with robust SE</strong> — never paraphrase OR as RR.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、Logistic 模型的構成" data-en="I. Anatomy of a Logistic Model">一、模型構成</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">📈</div><h4 data-zh="解讀係數與 OR" data-en="Interpreting Coefficients &amp; OR">係數與 OR</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>β₁ = x₁ 每增加 1 單位的<strong>對數勝算</strong>變化</li>
+<li>OR = exp(β₁)；OR &gt; 1 → 風險升高；OR = 1 → 無關</li>
+<li>95% CI：exp(β̂ ± 1.96·SE)——在<em>對數尺度</em>對稱</li>
+<li>類別變數：每 level 相對於 reference 的 OR</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>β₁ = change in <strong>log-odds</strong> per unit of x₁</li>
+<li>OR = exp(β₁); OR &gt; 1 → higher risk; OR = 1 → null</li>
+<li>95% CI: exp(β̂ ± 1.96·SE) — symmetric on the <em>log</em> scale</li>
+<li>Categorical: OR of each level vs reference</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🧮</div><h4 data-zh="估計：IRLS、似然與檢定" data-en="Estimation: IRLS, Likelihood, Tests">估計與檢定</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>MLE via Newton-Raphson / IRLS</li>
+<li><strong>Wald</strong>：β̂/SE → N(0,1)（小樣本不穩）</li>
+<li><strong>LR</strong>：−2(logL₀ − logL₁) → χ²（首選）</li>
+<li><strong>Deviance</strong>：D = −2·logL；殘差類似 RSS</li>
+<li>Pseudo-R²：McFadden、Nagelkerke</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>MLE via Newton-Raphson / IRLS</li>
+<li><strong>Wald</strong>: β̂/SE → N(0,1) (unstable in small samples)</li>
+<li><strong>LR</strong>: −2(logL₀ − logL₁) → χ² (preferred)</li>
+<li><strong>Deviance</strong>: D = −2·logL; residuals analogous to RSS</li>
+<li>Pseudo-R²: McFadden, Nagelkerke</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">⚠️</div><h4 data-zh="分離問題 (Separation)" data-en="The Separation Problem">分離問題</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>當某共變數能<strong>完美預測</strong>結果，β̂ → ±∞，SE → ∞</li>
+<li>常見於：稀有事件、子群分析、ML 共線</li>
+<li>解法：<strong>Firth penalization</strong> (<code>logistf</code>, <code>brglm2</code>)，加 Jeffreys 先驗使 MLE 有限</li>
+<li>或：Bayesian logistic + 弱常規先驗</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>When a covariate <strong>perfectly predicts</strong> the outcome, β̂ → ±∞, SE → ∞</li>
+<li>Common in: rare outcomes, subgroup analyses, multicollinear ML</li>
+<li>Fix: <strong>Firth penalization</strong> (<code>logistf</code>, <code>brglm2</code>) — Jeffreys prior keeps MLE finite</li>
+<li>Or: Bayesian logistic with weakly informative priors</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🎯</div><h4 data-zh="判別 vs 校準" data-en="Discrimination vs Calibration">判別 vs 校準</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>判別</strong>（discrimination）：能否排序——AUC / ROC</li>
+<li><strong>校準</strong>（calibration）：預測機率是否與實際頻率相符——calibration plot、Hosmer-Lemeshow、Brier score</li>
+<li>高 AUC + 差校準：能排序但不能當機率報告（風險溝通失效）</li>
+<li>類別不平衡：用 PR-AUC 取代 ROC-AUC</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Discrimination</strong>: can it rank cases above non-cases — AUC / ROC</li>
+<li><strong>Calibration</strong>: do predicted probabilities match observed frequencies — calibration plot, Hosmer-Lemeshow, Brier</li>
+<li>High AUC + poor calibration: ranks well but cannot be communicated as probability</li>
+<li>Class imbalance: prefer PR-AUC over ROC-AUC</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>不可崩塌性 (non-collapsibility)：</strong>同一個 exposure 的 OR 會隨加入無關共變數而<em>變大</em>——這不是 confounding 修正，而是 logistic OR 的數學性質。意思是：你<em>不能</em>跨論文比較 OR；要嚴謹比較 effect size，請用 RR 或 risk difference。</div>
+<div data-lang="en"><strong>Non-collapsibility:</strong> the OR for the same exposure changes (typically grows) when you add irrelevant covariates — this is a mathematical property of logistic OR, not confounding adjustment. Bottom line: do <em>not</em> compare ORs across papers with different covariate sets; for true effect-size comparison use RR or risk difference.</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="重塑 S 曲線：β₀ 與 β₁ 如何影響預測" data-en="Reshape the S-curve: β₀ &amp; β₁ at Work">重塑 S 曲線</h2>
+<div data-lang="zh"><p>下面是「真實資料」（產生自固定的 β₀=−2, β₁=0.6）。拖動下方的<strong>擬合滑桿</strong>來改變模型的 β₀（截距）與 β₁（斜率），看 S 曲線如何隨之伸縮平移，同時顯示對應 OR、樣本 AUC、與平均 deviance。當你把滑桿放在 (−2, 0.6) 時擬合最好。</p></div>
+<div data-lang="en"><p>The dots are "true data" (generated from fixed β₀=−2, β₁=0.6). Move the <strong>fit sliders</strong> to change the model's β₀ (intercept) and β₁ (slope) and watch the S-curve stretch and shift, with live OR, sample AUC, and mean deviance. The best fit sits near (−2, 0.6).</p></div>
+<div class="interactive-panel">
+<div class="sim-stats">
+  <span class="sim-stat pass" id="statOR">—</span>
+  <span class="sim-stat pass" id="statAUC">—</span>
+  <span class="sim-stat fail" id="statDev">—</span>
+</div>
+<div class="slider-group"><label><span data-zh="截距 β₀" data-en="Intercept β₀">β₀</span> <span id="valB0">-2.0</span></label><input type="range" id="sliderB0" min="-60" max="40" value="-20" step="1"></div>
+<div class="slider-group"><label><span data-zh="斜率 β₁" data-en="Slope β₁">β₁</span> <span id="valB1">0.60</span></label><input type="range" id="sliderB1" min="-20" max="30" value="6" step="1"></div>
+<div class="chart-container"><canvas id="logitChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="灰點：觀測 (jittered)；藍線：擬合 S 曲線；橘虛線：真實生成曲線。" data-en="Gray dots: observations (jittered); blue: fitted S-curve; orange dashed: true generating curve.">灰點：觀測；藍線：擬合；橘虛線：真實曲線</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Bioinfo bridge ===== -->
+<section class="section">
+<div class="section-label" data-zh="生物資訊應用" data-en="BIOINFO APPLICATIONS">生物資訊應用</div>
+<h2 data-zh="二、在 omics / 流病的常見場景" data-en="II. Common omics / epidemiology applications">二、常見應用</h2>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="場景" data-en="Scenario">場景</th>
+<th data-zh="模型/輸出" data-en="Model / Output">模型 / 輸出</th>
+<th data-zh="注意事項" data-en="Notes">注意</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">病例-對照 GWAS</td><td data-lang="zh"><code>case ~ SNP + PC1-5</code></td><td data-lang="zh">罕見變異 → Firth</td><td data-lang="en">Case-control GWAS</td><td data-lang="en"><code>case ~ SNP + PC1-5</code></td><td data-lang="en">Rare variants → Firth</td></tr>
+<tr><td data-lang="zh">預測響應的生物標記</td><td data-lang="zh">logistic + AUC / calibration</td><td data-lang="zh">交叉驗證避免過適</td><td data-lang="en">Response biomarker</td><td data-lang="en">logistic + AUC / calibration</td><td data-lang="en">CV to avoid overfit</td></tr>
+<tr><td data-lang="zh">細胞型別分類</td><td data-lang="zh">multinomial logit / softmax</td><td data-lang="zh">需 one-vs-rest 或 softmax</td><td data-lang="en">Cell-type classification</td><td data-lang="en">multinomial logit / softmax</td><td data-lang="en">One-vs-rest or softmax</td></tr>
+<tr><td data-lang="zh">罕見變異 burden 檢定</td><td data-lang="zh">SKAT / Firth logistic</td><td data-lang="zh">小樣本下 Wald 失準</td><td data-lang="en">Rare variant burden</td><td data-lang="en">SKAT / Firth logistic</td><td data-lang="en">Wald unstable at small n</td></tr>
+<tr><td data-lang="zh">臨床預測模型</td><td data-lang="zh">校準曲線 + DCA</td><td data-lang="zh">校準遠比 AUC 重要</td><td data-lang="en">Clinical prediction</td><td data-lang="en">calibration + DCA</td><td data-lang="en">Calibration &gt;&gt; AUC</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：擬合、OR、ROC、Firth" data-en="Code: Fit, OR, ROC, Firth">實作：擬合、OR、ROC、Firth</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- Logistic 全流程</span>
+<span class="func">library</span>(broom); <span class="func">library</span>(car); <span class="func">library</span>(pROC); <span class="func">library</span>(logistf)
+
+<span class="comment"># 1) 標準 logistic（病例-對照）</span>
+fit &lt;- <span class="func">glm</span>(case ~ exposure + age + sex,
+            family = <span class="func">binomial</span>(link = <span class="str">"logit"</span>), data = df)
+
+<span class="comment"># 2) 整理結果並指數化為 OR</span>
+broom::<span class="func">tidy</span>(fit, exponentiate = <span class="kw">TRUE</span>, conf.int = <span class="kw">TRUE</span>)
+car::<span class="func">Anova</span>(fit, type = <span class="str">"II"</span>)                  <span class="comment"># LR 檢定</span>
+
+<span class="comment"># 3) ROC / AUC</span>
+pred &lt;- <span class="func">predict</span>(fit, type = <span class="str">"response"</span>)
+roc1 &lt;- pROC::<span class="func">roc</span>(df$case, pred)
+roc1$auc; <span class="func">plot</span>(roc1)
+
+<span class="comment"># 4) 校準圖（10 等分）</span>
+<span class="func">library</span>(rms)
+<span class="func">val.prob</span>(pred, df$case)                       <span class="comment"># calibration plot + stats</span>
+
+<span class="comment"># 5) Firth 懲罰：解決分離與小樣本偏誤</span>
+fit_f &lt;- logistf::<span class="func">logistf</span>(case ~ variant + sex, data = df)
+<span class="func">summary</span>(fit_f)</pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">import</span> statsmodels.formula.api <span class="kw">as</span> smf
+<span class="kw">import</span> statsmodels.api <span class="kw">as</span> sm
+<span class="kw">from</span> sklearn.linear_model <span class="kw">import</span> LogisticRegression
+<span class="kw">from</span> sklearn.metrics <span class="kw">import</span> roc_auc_score
+<span class="kw">from</span> sklearn.calibration <span class="kw">import</span> calibration_curve
+
+<span class="comment"># 1) statsmodels：推論導向</span>
+fit = smf.<span class="func">logit</span>(<span class="str">"case ~ exposure + age + sex"</span>, data=df).<span class="func">fit</span>()
+<span class="func">print</span>(fit.<span class="func">summary</span>())
+
+<span class="comment"># 2) OR 與 CI</span>
+or_tab = np.<span class="func">exp</span>(fit.params).<span class="func">to_frame</span>(<span class="str">"OR"</span>).<span class="func">join</span>(np.<span class="func">exp</span>(fit.<span class="func">conf_int</span>()))
+<span class="func">print</span>(or_tab)
+
+<span class="comment"># 3) GLM 形式（等價）</span>
+sm.<span class="func">GLM</span>(y, X, family=sm.families.Binomial(sm.families.links.logit())).<span class="func">fit</span>()
+
+<span class="comment"># 4) sklearn：預測導向</span>
+clf = LogisticRegression(penalty=<span class="str">"l2"</span>, C=<span class="num">1.0</span>).<span class="func">fit</span>(X, y)
+proba = clf.<span class="func">predict_proba</span>(X)[:,<span class="num">1</span>]
+<span class="func">roc_auc_score</span>(y, proba)
+prob_true, prob_pred = <span class="func">calibration_curve</span>(y, proba, n_bins=<span class="num">10</span>)</pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>① 把 OR 說成「風險高 X 倍」——只有 baseline p 很小才對。② 用<em>同一筆</em>資料訓練 + 計算 AUC——測得的是樂觀偏誤。應用 <strong>k-fold CV</strong> 或留外部測試集。③ AUC = 0.85 就大喊「臨床可用」——若校準很差，所謂的 70% 機率實際只有 30%，模型不能拿來決策。</span>
+<span data-lang="en"><strong>Common mistakes:</strong> ① Reporting OR as "X times higher risk" — true only when baseline p is small. ② Training and evaluating AUC on the same data — optimistic bias. Use <strong>k-fold CV</strong> or held-out set. ③ Claiming AUC = 0.85 means "clinically useful" — if calibration is poor, "70% probability" might actually be 30%, useless for decisions.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 何時 OR 是 RR 的<em>差</em>近似？</p>
+<p data-lang="en">1. When is OR a poor approximation to RR?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 永遠等於 RR</span><span data-lang="en">A. Always equals RR</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 當事件非常罕見</span><span data-lang="en">B. When events are very rare</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 當事件常見（baseline p &gt; ~10%）時，OR 會誇大 RR</span><span data-lang="en">C. When events are common (baseline p &gt; ~10%), OR overstates RR</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 只有在連續結果才有差別</span><span data-lang="en">D. Only differs for continuous outcomes</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 什麼是「分離」(separation) 問題？如何修正？</p>
+<p data-lang="en">2. What is "separation" in logistic regression, and how is it fixed?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 訓練集與測試集沒分開——加 CV</span><span data-lang="en">A. Train/test not split — add CV</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 兩組變異不同——加變異穩健 SE</span><span data-lang="en">B. Heteroscedasticity — use robust SE</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 某共變數完美預測結果使 β̂ → ±∞——用 Firth 懲罰或 Bayesian 弱先驗</span><span data-lang="en">C. A covariate perfectly predicts the outcome forcing β̂ → ±∞ — fix with Firth penalty or Bayesian weak prior</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 多重共線性——刪除冗餘變數</span><span data-lang="en">D. Multicollinearity — drop redundancy</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 為什麼模型可以有高 AUC 卻校準很差？</p>
+<p data-lang="en">3. Why can a model have high AUC yet poor calibration?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 一個 bug 沒抓到</span><span data-lang="en">A. There is a bug</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. AUC 只衡量「能否把正類排在負類之前」（rank），不衡量機率是否與實際頻率一致</span><span data-lang="en">B. AUC measures only ranking (can it order cases above non-cases), not whether predicted probabilities match observed frequencies</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 校準總是與 AUC 等價</span><span data-lang="en">C. Calibration is always equivalent to AUC</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 不可能發生</span><span data-lang="en">D. Impossible</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="anova-mixed-models.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 7: ANOVA &amp; Mixed Models</span></a>
+<a href="glm-count-models.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 9: GLM &amp; Count Models</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Generate fixed binary data from logit(p) = -2 + 0.6 * x, x in [0, 10]
+const trueB0=-2,trueB1=0.6;
+const N=140;
+const xs=[],ys=[];
+// Use a deterministic pseudo-random sequence
+let seed=42;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
+for(let i=0;i<N;i++){const x=rand()*10;const p=1/(1+Math.exp(-(trueB0+trueB1*x)));const y=rand()<p?1:0;xs.push(x);ys.push(y);}
+
+function sigmoid(z){return 1/(1+Math.exp(-z));}
+
+const logitChart=new Chart(document.getElementById('logitChart'),{
+  data:{datasets:[
+    {type:'scatter',label:'observations',data:xs.map((x,i)=>({x,y:ys[i]+(Math.random()-0.5)*0.06})),backgroundColor:'rgba(120,120,120,0.55)',pointRadius:3},
+    {type:'line',label:'fitted',data:[],borderColor:'rgba(33,102,172,0.95)',borderWidth:2.5,pointRadius:0,fill:false,tension:0.2},
+    {type:'line',label:'true curve',data:[],borderColor:'rgba(230,126,34,0.9)',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,tension:0.2}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{position:'top'}},
+    scales:{x:{type:'linear',title:{display:true,text:'x'},min:0,max:10},
+            y:{title:{display:true,text:'P(Y=1)'},min:-0.1,max:1.1}}}
+});
+
+// Pre-compute true curve once
+const trueCurve=[];for(let v=0;v<=100;v++){const x=v/10;trueCurve.push({x,y:sigmoid(trueB0+trueB1*x)});}
+logitChart.data.datasets[2].data=trueCurve;
+
+// Compute AUC by Mann-Whitney
+function auc(ys,probs){let pos=[],neg=[];for(let i=0;i<ys.length;i++)(ys[i]===1?pos:neg).push(probs[i]);if(!pos.length||!neg.length)return 0.5;let s=0;for(const p of pos)for(const n of neg){if(p>n)s++;else if(p===n)s+=0.5;}return s/(pos.length*neg.length);}
+
+function updateLogit(){
+  const b0=(+document.getElementById('sliderB0').value)/10;
+  const b1=(+document.getElementById('sliderB1').value)/10;
+  document.getElementById('valB0').textContent=b0.toFixed(1);
+  document.getElementById('valB1').textContent=b1.toFixed(2);
+  // Fitted curve
+  const fit=[];for(let v=0;v<=100;v++){const x=v/10;fit.push({x,y:sigmoid(b0+b1*x)});}
+  logitChart.data.datasets[1].data=fit;
+  logitChart.update('none');
+  // Stats
+  const probs=xs.map(x=>sigmoid(b0+b1*x));
+  let dev=0;for(let i=0;i<xs.length;i++){const p=Math.min(Math.max(probs[i],1e-9),1-1e-9);dev+=-(ys[i]*Math.log(p)+(1-ys[i])*Math.log(1-p));}
+  dev=dev/xs.length;
+  const aucVal=auc(ys,probs);
+  const orVal=Math.exp(b1);
+
+  const L=I18n.get();
+  const tOR=L==='zh'?'每單位 OR ':'OR per unit ';
+  const tAUC='AUC ';
+  const tDev=L==='zh'?'平均 deviance ':'mean deviance ';
+  document.getElementById('statOR').textContent=tOR+orVal.toFixed(2);
+  document.getElementById('statAUC').textContent=tAUC+aucVal.toFixed(3);
+  const dEl=document.getElementById('statDev');
+  dEl.textContent=tDev+dev.toFixed(3);
+  dEl.classList.toggle('pass',dev<0.5);
+  dEl.classList.toggle('fail',dev>=0.5);
+}
+['sliderB0','sliderB1'].forEach(id=>document.getElementById(id).addEventListener('input',updateLogit));
+document.addEventListener('langchange',updateLogit);
+updateLogit();
+
+const QF={
+  zh:{
+    q1_y:'baseline 機率越大，OR 越誇大 RR。常見結局請改報 RR（log-binomial 或 Poisson+robust SE）。',q1_n:'正確答案已標示。事件「常見」時 OR 才會嚴重偏離 RR。',
+    q2_y:'分離使 MLE 不存在；Firth 懲罰加入 Jeffreys 先驗，使估計有限且降偏誤。',q2_n:'正確答案已標示。Firth 是分離的標準解。',
+    q3_y:'AUC 是「順序」指標；可以全程把機率乘以 0.5 仍保有相同 AUC，但校準崩潰。',q3_n:'正確答案已標示。AUC 只衡量排序，不衡量機率對齊。'
+  },
+  en:{
+    q1_y:'Larger baseline p makes OR overstate RR. For common outcomes report RR (log-binomial or Poisson + robust SE).',q1_n:'Correct answer highlighted. OR diverges from RR when events are common.',
+    q2_y:'Separation breaks MLE existence; Firth (Jeffreys prior) keeps estimates finite and reduces bias.',q2_n:'Correct answer highlighted. Firth is the standard remedy for separation.',
+    q3_y:'AUC only measures ranking; you can rescale all probabilities by 0.5 and keep AUC, while calibration collapses.',q3_n:'Correct answer highlighted. AUC ranks; calibration aligns probabilities with frequencies.'
+  }
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.innerHTML=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

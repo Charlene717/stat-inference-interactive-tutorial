@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Statistical Inference Interactive Tutorial</title>
+<meta name="description" content="Bilingual interactive tutorial on statistical inference for bioinformatics — frequentist, Bayesian, GLM and genomics applications.">
+<link rel="stylesheet" href="styles.css"></head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li>
+    <li><a href="point-estimation.html">Est.</a></li>
+    <li><a href="confidence-intervals-bootstrap.html">CI</a></li>
+    <li><a href="hypothesis-testing.html">HT</a></li>
+    <li><a href="common-tests.html">Tests</a></li>
+    <li><a href="linear-regression.html">LM</a></li>
+    <li><a href="anova-mixed-models.html">ANOVA</a></li>
+    <li><a href="logistic-regression.html">Logit</a></li>
+    <li><a href="glm-count-models.html">GLM</a></li>
+    <li><a href="bayes-priors-posteriors.html">Bayes</a></li>
+    <li><a href="mcmc-diagnostics.html">MCMC</a></li>
+    <li><a href="posterior-summaries.html">Post.</a></li>
+    <li><a href="empirical-bayes-limma.html">EB</a></li>
+    <li><a href="multiple-testing-fdr.html">FDR</a></li>
+    <li><a href="de-statistics.html">DE</a></li>
+    <li><a href="permutation-gsea.html">Perm.</a></li>
+    <li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<header class="hub-hero"><div style="position:relative;z-index:1;">
+<h1 data-zh="統計推論互動式教學" data-en="Statistical Inference — Interactive Tutorial">統計推論互動式教學</h1>
+<p data-lang="zh">從機率分布到貝氏推論，從多重檢定到存活分析——17 個主題帶你打通生物資訊統計的任督二脈，每頁皆附互動模擬、R / Python 雙語程式碼與三題自我檢測。</p>
+<p data-lang="en">From probability distributions to Bayesian inference, from multiple testing to survival analysis — 17 modules tying classical statistics to bioinformatics practice, each with interactive simulations, R/Python code, and self-check quizzes.</p>
+</div></header>
+
+<h2 class="hub-section-title"><span>01</span> <span data-zh="頻率學派基礎" data-en="Frequentist Foundations">頻率學派基礎</span></h2>
+<div class="hub-steps-grid">
+  <a href="probability-and-distributions.html" class="hub-card"><div class="hub-emoji">🎲</div><span class="step-num">Step 1</span><h3 data-zh="機率與分布" data-en="Probability &amp; Distributions">機率與分布</h3><p data-lang="zh">隨機變數、離散/連續分布、CLT 與 LLN——為 RNA-seq 計數 (NB) 與檢定統計量打下基礎。</p><p data-lang="en">Random variables, discrete/continuous distributions, CLT and LLN — the foundation for NB count models and test statistics.</p></a>
+  <a href="point-estimation.html" class="hub-card"><div class="hub-emoji">🎯</div><span class="step-num">Step 2</span><h3 data-zh="點估計與抽樣分布" data-en="Point Estimation">點估計與抽樣分布</h3><p data-lang="zh">MLE、動差法、Fisher information 與 Cramér-Rao 下界，理解 DESeq2 為何要做 dispersion shrinkage。</p><p data-lang="en">MLE, method of moments, Fisher information, Cramér-Rao — why DESeq2 shrinks dispersion.</p></a>
+  <a href="confidence-intervals-bootstrap.html" class="hub-card"><div class="hub-emoji">📏</div><span class="step-num">Step 3</span><h3 data-zh="信賴區間與 Bootstrap" data-en="Confidence Intervals &amp; Bootstrap">信賴區間與 Bootstrap</h3><p data-lang="zh">CI 的正確解讀，BCa bootstrap 補救解析解失效的場景，以及與貝氏 credible interval 的差異。</p><p data-lang="en">Correct CI interpretation, BCa bootstrap when analytic SEs fail, contrast with credible intervals.</p></a>
+  <a href="hypothesis-testing.html" class="hub-card"><div class="hub-emoji">⚖️</div><span class="step-num">Step 4</span><h3 data-zh="假設檢定與錯誤" data-en="Hypothesis Testing &amp; Errors">假設檢定與錯誤</h3><p data-lang="zh">型一/型二錯誤、檢定力、p-value 誤用——告別「p&gt;0.05 等於沒效果」。</p><p data-lang="en">Type I/II errors, power, p-value misuse — escape "p&gt;0.05 means no effect".</p></a>
+  <a href="common-tests.html" class="hub-card"><div class="hub-emoji">🧪</div><span class="step-num">Step 5</span><h3 data-zh="常見檢定方法" data-en="Common Tests">常見檢定方法</h3><p data-lang="zh">t / Welch / 配對 / Wilcoxon / Mann-Whitney / χ² / Fisher / ANOVA / Kruskal——附決策樹。</p><p data-lang="en">t / Welch / paired / Wilcoxon / Mann-Whitney / χ² / Fisher / ANOVA / Kruskal — with a decision tree.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>02</span> <span data-zh="迴歸與 GLM" data-en="Regression &amp; GLM">迴歸與 GLM</span></h2>
+<div class="hub-steps-grid">
+  <a href="linear-regression.html" class="hub-card"><div class="hub-emoji">📈</div><span class="step-num">Step 6</span><h3 data-zh="線性迴歸與診斷" data-en="Linear Regression &amp; Diagnostics">線性迴歸與診斷</h3><p data-lang="zh">OLS 假設、殘差圖、VIF、Cook's distance、HC3 穩健標準誤。</p><p data-lang="en">OLS assumptions, residual plots, VIF, Cook's distance, HC3 robust SEs.</p></a>
+  <a href="anova-mixed-models.html" class="hub-card"><div class="hub-emoji">🔀</div><span class="step-num">Step 7</span><h3 data-zh="ANOVA、ANCOVA、混合模型" data-en="ANOVA / Mixed Models">ANOVA / 混合模型</h3><p data-lang="zh">lme4、批次效應、部分匯整 (partial pooling)、emmeans 對比。</p><p data-lang="en">lme4, batch effects, partial pooling, emmeans contrasts.</p></a>
+  <a href="logistic-regression.html" class="hub-card"><div class="hub-emoji">🎚️</div><span class="step-num">Step 8</span><h3 data-zh="Logistic 迴歸與勝算比" data-en="Logistic Regression &amp; Odds Ratios">Logistic 迴歸與勝算比</h3><p data-lang="zh">logit 連結、OR 解讀、Firth 修正、ROC vs 校準。</p><p data-lang="en">logit link, OR interpretation, Firth correction, ROC vs calibration.</p></a>
+  <a href="glm-count-models.html" class="hub-card"><div class="hub-emoji">🔢</div><span class="step-num">Step 9</span><h3 data-zh="GLM：Poisson、NB、零膨脹" data-en="GLM Family — Poisson / NB / ZI">GLM 計數模型</h3><p data-lang="zh">連結函數、deviance、過度離散、零膨脹——直通 DESeq2 / edgeR。</p><p data-lang="en">Links, deviance, overdispersion, zero-inflation — the bridge to DESeq2 / edgeR.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>03</span> <span data-zh="貝氏推論" data-en="Bayesian Inference">貝氏推論</span></h2>
+<div class="hub-steps-grid">
+  <a href="bayes-priors-posteriors.html" class="hub-card"><div class="hub-emoji">🧠</div><span class="step-num">Step 10</span><h3 data-zh="貝氏定理、先驗、後驗" data-en="Bayes' Theorem, Priors, Posteriors">貝氏定理、先驗、後驗</h3><p data-lang="zh">Beta-Binomial、Gamma-Poisson 等共軛先驗，與後驗預測分布。</p><p data-lang="en">Beta-Binomial, Gamma-Poisson conjugate priors, and posterior predictive distributions.</p></a>
+  <a href="mcmc-diagnostics.html" class="hub-card"><div class="hub-emoji">⛓️</div><span class="step-num">Step 11</span><h3 data-zh="MCMC、HMC 與收斂診斷" data-en="MCMC, HMC &amp; Diagnostics">MCMC 與診斷</h3><p data-lang="zh">Stan / brms / PyMC、NUTS、R-hat、ESS、divergent transitions。</p><p data-lang="en">Stan / brms / PyMC, NUTS, R-hat, ESS, divergent transitions.</p></a>
+  <a href="posterior-summaries.html" class="hub-card"><div class="hub-emoji">📐</div><span class="step-num">Step 12</span><h3 data-zh="後驗摘要、貝氏因子、PPC" data-en="Posterior Summaries, BF, PPC">後驗摘要 / BF / PPC</h3><p data-lang="zh">HDI / ETI、posterior predictive check、LOO-CV、WAIC。</p><p data-lang="en">HDI vs ETI, posterior predictive checks, LOO-CV, WAIC.</p></a>
+  <a href="empirical-bayes-limma.html" class="hub-card"><div class="hub-emoji">🪢</div><span class="step-num">Step 13</span><h3 data-zh="階層貝氏與經驗貝氏" data-en="Hierarchical &amp; Empirical Bayes">階層 / 經驗貝氏</h3><p data-lang="zh">James-Stein、limma eBayes、ashr——20,000 基因如何借力借強度。</p><p data-lang="en">James-Stein, limma eBayes, ashr — borrowing strength across 20,000 genes.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>04</span> <span data-zh="生物資訊應用" data-en="Bioinformatics Applications">生物資訊應用</span></h2>
+<div class="hub-steps-grid">
+  <a href="multiple-testing-fdr.html" class="hub-card"><div class="hub-emoji">🚦</div><span class="step-num">Step 14</span><h3 data-zh="多重檢定與 FDR" data-en="Multiple Testing &amp; FDR">多重檢定與 FDR</h3><p data-lang="zh">Bonferroni / BH / Storey q-value / IHW / local FDR；p-value 直方圖診斷。</p><p data-lang="en">Bonferroni / BH / Storey q-value / IHW / local FDR; p-value histogram diagnostics.</p></a>
+  <a href="de-statistics.html" class="hub-card"><div class="hub-emoji">🧬</div><span class="step-num">Step 15</span><h3 data-zh="差異表現統計：limma / edgeR / DESeq2" data-en="DE Statistics — limma / edgeR / DESeq2">DE 統計核心</h3><p data-lang="zh">voom、NB GLM、QL F-test、lfcShrink (apeglm/ashr)。</p><p data-lang="en">voom, NB GLM, QL F-test, lfcShrink (apeglm/ashr).</p></a>
+  <a href="permutation-gsea.html" class="hub-card"><div class="hub-emoji">🔄</div><span class="step-num">Step 16</span><h3 data-zh="排列、Bootstrap、GSEA" data-en="Permutation, Bootstrap, GSEA">排列 / Bootstrap / GSEA</h3><p data-lang="zh">樣本排列 vs 基因排列、CAMERA、fgsea、competitive vs self-contained。</p><p data-lang="en">Sample vs gene permutation, CAMERA, fgsea, competitive vs self-contained tests.</p></a>
+  <a href="survival-analysis.html" class="hub-card"><div class="hub-emoji">⏳</div><span class="step-num">Step 17</span><h3 data-zh="存活分析" data-en="Survival Analysis">存活分析</h3><p data-lang="zh">Kaplan-Meier、log-rank、Cox PH、Schoenfeld 殘差、競爭風險。</p><p data-lang="en">Kaplan-Meier, log-rank, Cox PH, Schoenfeld residuals, competing risks.</p></a>
+</div>
+
+<h2 class="hub-section-title"><span>05</span> <span data-zh="延伸學習" data-en="Further Learning">延伸學習</span></h2>
+<div class="hub-steps-grid">
+  <a href="../references/index.html" class="hub-card"><div class="hub-emoji">📚</div><span class="step-num">References</span><h3 data-zh="參考資料佐證" data-en="References &amp; Citations">參考資料佐證</h3><p data-lang="zh">17 主題的權威書籍（Wasserman、Casella &amp; Berger、Gelman BDA3）、原始論文、套件文件，附 DOI 連結。</p><p data-lang="en">Canonical books (Wasserman, Casella &amp; Berger, Gelman BDA3), original papers, and package docs for all 17 topics — with DOI links.</p></a>
+  <a href="../stat-inference-quiz/index.html" class="hub-card"><div class="hub-emoji">📝</div><span class="step-num">Quiz</span><h3 data-zh="互動式考題" data-en="Interactive Quiz">互動式考題</h3><p data-lang="zh">涵蓋 17 主題的單選、多選、是非題，內建錯題複習、隨機練習、考試模式與多使用者進度。</p><p data-lang="en">Single-choice, multi-select, and T/F questions across all 17 topics — with wrong-answer review, exam mode, and multi-user progress tracking.</p></a>
+</div>
+<div style="height:60px"></div>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+</body></html>

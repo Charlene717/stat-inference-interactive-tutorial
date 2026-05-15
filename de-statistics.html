@@ -1,0 +1,365 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 15: DE Statistics (limma / edgeR / DESeq2) — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html" class="active">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 15 / 17</div>
+<h1 data-zh="差異表現統計：limma / edgeR / DESeq2" data-en="DE Statistics: limma / edgeR / DESeq2">差異表現統計：limma / edgeR / DESeq2</h1>
+<p class="subtitle" data-lang="zh">這一頁是整套教學的<strong>生信核心</strong>：把 GLM、Empirical Bayes、FDR、變異收縮全部組裝起來，變成 RNA-seq DE 分析的三大標準工具。</p>
+<p class="subtitle" data-lang="en">This is the <strong>bioinformatics core</strong> of the whole tutorial: GLMs, empirical Bayes, FDR, and variance shrinkage assembled into the three workhorse pipelines of RNA-seq DE.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== OVERVIEW ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="DE 的核心問題：為何不能直接用 t 檢定" data-en="The core DE problem: why not just t-test?">DE 的核心問題</h2>
+<div data-lang="zh">
+<p>差異表現（Differential Expression, DE）的目標：在兩組（或多組）樣本之間，找出哪些基因的表現量有統計上顯著的差異。表面看是兩樣本 t 檢定的延伸，但 RNA-seq 資料有<strong>三個關鍵挑戰</strong>：</p>
+<ol>
+<li><strong>計數本質</strong>：reads 是非負整數、過度離散 → 不能用 Gaussian t 檢定，必須用 NB GLM。</li>
+<li><strong>基因數遠大於樣本數</strong>（m=20,000, n=6）→ 每基因的變異估計極不穩 → 必須借力 empirical Bayes 收縮。</li>
+<li><strong>大量多重檢定</strong> → 必須 FDR 校正。</li>
+</ol>
+<p>三大工具用三種策略解決這個問題：<strong>DESeq2</strong> 用 NB GLM + Wald / LRT + dispersion-trend 收縮；<strong>edgeR</strong> 用 NB GLM + quasi-likelihood F 檢定 + tag-wise dispersion 收縮；<strong>limma-voom</strong> 用對數轉換 + precision weight + 線性模型 + moderated t。三者數學基礎略異，但在大多數情境下結果高度一致。</p>
+</div>
+<div data-lang="en">
+<p>Differential Expression (DE) asks: between two (or more) conditions, which genes change significantly? It looks like an extended t-test, but RNA-seq data has <strong>three critical wrinkles</strong>:</p>
+<ol>
+<li><strong>Count nature</strong>: reads are non-negative integers and overdispersed → Gaussian t-tests are inappropriate, NB GLM is needed.</li>
+<li><strong>m ≫ n</strong> (20,000 genes vs 6 samples) → per-gene variance is wildly unstable → empirical Bayes shrinkage is essential.</li>
+<li><strong>Massive multiple testing</strong> → FDR correction is mandatory.</li>
+</ol>
+<p>The three workhorse tools handle these differently: <strong>DESeq2</strong> uses NB GLM + Wald / LRT + dispersion-trend shrinkage; <strong>edgeR</strong> uses NB GLM + quasi-likelihood F-test + tag-wise dispersion shrinkage; <strong>limma-voom</strong> log-transforms, applies precision weights, fits a linear model, and computes a moderated t. The maths differ, but for most analyses they agree closely.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>選擇原則：</strong>大型樣本 (n &gt; 12 / 組) — limma-voom 速度快、診斷工具最齊全；小型 (n=3–6 / 組) — DESeq2 / edgeR 的變異收縮更穩；scRNA-seq 偽-bulk — DESeq2 / edgeR；複雜設計（時間序列、互動） — limma + duplicateCorrelation 最靈活。</span>
+<span data-lang="en"><strong>How to choose:</strong> large samples (n &gt; 12 / group) → limma-voom is fast and has the richest diagnostics; small samples (n=3–6 / group) → DESeq2 / edgeR shrinkage is more reliable; pseudo-bulk scRNA-seq → DESeq2 / edgeR; complex designs (time-course, interactions) → limma with duplicateCorrelation is most flexible.</span>
+</div></div>
+</section>
+
+<!-- ===== CORE CONCEPTS ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、三大工具的數學引擎" data-en="I. The three engines">一、三大工具的數學引擎</h2>
+
+<div class="card-grid cols-3">
+<div class="card"><div class="card-icon">🧬</div><h4>DESeq2</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>NB GLM：<code>log μ = X β + log(s)</code>，<code>s</code> 為 size factor。</li>
+<li>Dispersion-mean trend：估計 trend → MLE → 朝 trend 收縮（empirical Bayes）。</li>
+<li>Wald 檢定 (預設) 或 LRT（兩模型比較）。</li>
+<li>Cook's distance 自動偵測極端 outlier 基因。</li>
+<li><code>lfcShrink</code>：apeglm / ashr / normal——讓低 count 基因的 LFC 不再亂跳。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>NB GLM: <code>log μ = X β + log(s)</code>, <code>s</code> = size factor.</li>
+<li>Dispersion-mean trend: fit trend → MLE → shrink to trend (empirical Bayes).</li>
+<li>Wald (default) or LRT (model comparison).</li>
+<li>Cook's distance flags outlier genes automatically.</li>
+<li><code>lfcShrink</code> with apeglm / ashr / normal calms low-count LFCs.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">⚙️</div><h4>edgeR</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>NB GLM，TMM normalization（trimmed-mean）。</li>
+<li>Tag-wise dispersion + common / trended 三層收縮。</li>
+<li>Quasi-likelihood F 檢定（<code>glmQLFTest</code>）——對小樣本提供額外 Type I 控制。</li>
+<li>適合複雜設計矩陣與 contrasts。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>NB GLM with TMM (trimmed mean of M-values) normalization.</li>
+<li>Tag-wise dispersion + common / trended three-tier shrinkage.</li>
+<li>Quasi-likelihood F-test (<code>glmQLFTest</code>) — better small-sample Type I control.</li>
+<li>Handles complex design matrices and contrasts elegantly.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">📈</div><h4>limma-voom</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>對 <code>log2(CPM+0.5)</code> 跑線性模型——重用 limma 的 Gaussian 工具。</li>
+<li><code>voom</code>：用 mean-variance trend 計算 <strong>precision weights</strong>。</li>
+<li>moderated t：variance shrinkage → 借力其他基因 → 更穩。</li>
+<li>速度最快，適合 n &gt; 12 或時間序列／random effect 設計。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Linear model on <code>log2(CPM+0.5)</code> — reuses limma's Gaussian toolkit.</li>
+<li><code>voom</code>: uses mean-variance trend to compute <strong>precision weights</strong>.</li>
+<li>moderated t: variance shrinkage borrowing across genes → more stable.</li>
+<li>Fastest; suits n &gt; 12 or time-course / random-effect designs.</li>
+</ul></div>
+</div>
+</div>
+
+<h2 data-zh="二、收縮（shrinkage）：為何低 count 基因的 LFC 一定要校正" data-en="II. Shrinkage: why low-count LFCs must be corrected">二、變異與 LFC 收縮</h2>
+
+<div data-lang="zh">
+<p>對 count = 2 vs 50 的基因，原始 <code>log2 FC ≈ 4.6</code>，但這個估計變異極大——很可能是抽樣噪音。原始 LFC 在低 count 區域呈「<strong>火山圖底部噴泉</strong>」狀，把基因按 |LFC| 排名會把噪音排到前面。</p>
+<p><strong>收縮</strong>把每個基因的 LFC 朝整體分布的中心（通常是 0）拉近，拉近的程度與該基因 LFC 的<em>不確定度</em>成正比：高 count、穩定的基因幾乎不被收縮；低 count、雜訊大的基因被強力收縮。結果——MA plot 變得乾淨、排名穩定、可重複性提升。</p>
+<p>DESeq2 的 <code>lfcShrink(coef=, type="apeglm")</code> 是當前最常見的選擇；<code>ashr</code> 支援多 contrast；<code>normal</code>（舊版預設）通常過度收縮，現已不推薦。</p>
+</div>
+<div data-lang="en">
+<p>For a gene with counts 2 vs 50 the raw <code>log2 FC ≈ 4.6</code>, but this estimate has enormous variance — likely sampling noise. Raw LFCs produce a "<strong>fountain at the bottom of the volcano plot</strong>"; ranking genes by |LFC| pushes noise to the top.</p>
+<p><strong>Shrinkage</strong> pulls each gene's LFC toward the centre of the overall distribution (usually 0), with strength proportional to that gene's <em>uncertainty</em>: high-count, stable genes barely move; low-count, noisy genes are heavily shrunk. The result — cleaner MA plots, stable rankings, reproducible top-hits.</p>
+<p>DESeq2's <code>lfcShrink(coef=, type="apeglm")</code> is the current default of choice; <code>ashr</code> handles multi-contrast scenarios; <code>normal</code> (the legacy default) over-shrinks and is no longer recommended.</p>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>批次效應陷阱：</strong>絕對<em>不要</em>先用 ComBat 移除批次，再對殘差做 DE——這會破壞 SE 計算、造成假陽性。正確作法是把批次當<strong>共變數</strong>放進設計矩陣 <code>~ batch + condition</code>，讓 DESeq2 / limma 在估計效應時同時校正批次。</div>
+<div data-lang="en"><strong>Batch-effect trap:</strong> do NOT first remove batch via ComBat and then run DE on residuals — this breaks SE computation and inflates false positives. The correct approach is to add batch as a <strong>covariate</strong> in the design matrix <code>~ batch + condition</code>, letting DESeq2 / limma adjust during estimation.</div>
+</div></div>
+
+<h2 data-zh="三、獨立過濾與設計矩陣" data-en="III. Independent Filtering & Design Matrices">三、獨立過濾與設計</h2>
+
+<div data-lang="zh">
+<p><strong>獨立過濾</strong>：在做 FDR 之前移除「幾乎沒被表達」的基因（如全部樣本 count &lt; 10）——這個過濾準則（mean count）與 H₀ 下的 p-value 獨立，所以不破壞 FDR，但會大幅增加 BH 的檢力（因為 m 變小）。DESeq2 預設啟用，<code>results(dds)</code> 會自動找最佳閾值。</p>
+<p><strong>設計矩陣是 DE 分析的靈魂。</strong>常見模式：<code>~ condition</code>（單因子）；<code>~ batch + condition</code>（含批次校正）；<code>~ condition * time</code>（互動）；<code>~ subject + condition</code>（配對設計，每位個體自己當對照）；<code>~ batch + condition</code> + <code>limma::duplicateCorrelation</code>（技術重複的 random effect）。第一個變數通常是 nuisance（先校正掉），最後一個是要檢定的主效應。</p>
+</div>
+<div data-lang="en">
+<p><strong>Independent filtering:</strong> remove very-low-expression genes (e.g. count &lt; 10 across all samples) before FDR. The filter (mean count) is independent of the null p-value, so FDR remains valid, but m shrinks — boosting BH power. DESeq2 enables it by default; <code>results(dds)</code> auto-selects the optimal threshold.</p>
+<p><strong>The design matrix is the heart of DE analysis.</strong> Common patterns: <code>~ condition</code> (single factor); <code>~ batch + condition</code> (with batch adjustment); <code>~ condition * time</code> (interaction); <code>~ subject + condition</code> (paired); <code>~ batch + condition</code> + <code>limma::duplicateCorrelation</code> (random effect for technical replicates). Leading terms are usually nuisance variables to adjust away; the last term is the main effect of interest.</p>
+</div>
+</section>
+
+<!-- ===== INTERACTIVE ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="火山圖：原始 LFC vs 收縮 LFC" data-en="Volcano: raw vs shrunken LFC">火山圖：原始 vs 收縮 LFC</h2>
+<div data-lang="zh"><p>下方為合成 RNA-seq 資料（5,000 基因，<span id="hint-n">每組 n=4</span>）。<strong>切換</strong>到 shrunken LFC 觀察：低 count 區的「噴泉」被壓平，高信號高表達的真實 DE 基因仍清晰可見。增加每組 n 觀察整體火山圖如何收窄、p-value 普遍降低。</p></div>
+<div data-lang="en"><p>Below is synthetic RNA-seq data (5,000 genes, <span id="hint-n2">n=4 per group</span>). Toggle to shrunken LFC: the low-count fountain collapses while high-signal, well-expressed true DE genes stay clearly visible. Increase n to watch the volcano tighten and p-values drop.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats">
+  <span class="sim-stat pass" id="statSig">DE @ FDR 5%: —</span>
+  <span class="sim-stat pass" id="statN">n —</span>
+  <span class="sim-stat fail" id="statShr">—</span>
+</div>
+<div class="slider-group"><label><span data-zh="每組樣本 n" data-en="Samples per group n">n / group</span> <span id="valN">4</span></label><input type="range" id="sliderN" min="3" max="20" value="4" step="1"></div>
+<div class="slider-group"><label><span data-zh="真實 DE 基因比例 (%)" data-en="True-DE fraction (%)">% true DE</span> <span id="valDE">10</span></label><input type="range" id="sliderDE" min="2" max="30" value="10" step="1"></div>
+<div class="slider-group"><label><input type="checkbox" id="toggleShr" checked> <span data-zh="使用 apeglm 風格收縮 LFC" data-en="Use apeglm-style shrinkage on LFC">使用收縮 LFC</span></label></div>
+<div class="chart-container"><canvas id="volcano"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;">X: log2 FC | Y: −log10 p | <span data-zh="紅點：FDR &lt; 5%" data-en="Red: FDR &lt; 5%">紅點：FDR &lt; 5%</span></p>
+</div>
+</section>
+
+<!-- ===== CODE ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：三大工具的標準流程" data-en="Code: three workhorse pipelines">實作：三大標準流程</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- 三大 DE 工具的標準骨架</span>
+<span class="comment"># counts: gene × sample 整數矩陣; col_data: 樣本後設資料 (含 condition, batch)</span>
+
+<span class="comment"># ===== DESeq2 =====</span>
+<span class="func">library</span>(DESeq2)
+dds &lt;- <span class="func">DESeqDataSetFromMatrix</span>(counts, col_data, design = ~ batch + condition)
+dds &lt;- <span class="func">DESeq</span>(dds)                                 <span class="comment"># size factor + dispersion + GLM</span>
+res &lt;- <span class="func">results</span>(dds, contrast = <span class="func">c</span>(<span class="str">"condition"</span>,<span class="str">"KO"</span>,<span class="str">"WT"</span>))
+res_shrunk &lt;- <span class="func">lfcShrink</span>(dds, coef=<span class="str">"condition_KO_vs_WT"</span>, type=<span class="str">"apeglm"</span>)
+<span class="func">summary</span>(res_shrunk); <span class="func">plotMA</span>(res_shrunk)
+
+<span class="comment"># ===== edgeR (NB QL F) =====</span>
+<span class="func">library</span>(edgeR)
+dge &lt;- <span class="func">DGEList</span>(counts, group = col_data$condition)
+keep &lt;- <span class="func">filterByExpr</span>(dge, group = col_data$condition); dge &lt;- dge[keep, ]
+dge &lt;- <span class="func">calcNormFactors</span>(dge)                          <span class="comment"># TMM</span>
+design &lt;- <span class="func">model.matrix</span>(~ batch + condition, col_data)
+dge &lt;- <span class="func">estimateDisp</span>(dge, design)
+fit &lt;- <span class="func">glmQLFit</span>(dge, design)
+qlf &lt;- <span class="func">glmQLFTest</span>(fit, coef = <span class="str">"conditionKO"</span>)
+<span class="func">topTags</span>(qlf, n = <span class="num">20</span>)
+
+<span class="comment"># ===== limma-voom =====</span>
+<span class="func">library</span>(limma)
+v   &lt;- <span class="func">voom</span>(dge, design, plot = <span class="kw">TRUE</span>)              <span class="comment"># precision weights</span>
+fit &lt;- <span class="func">lmFit</span>(v, design)
+fit &lt;- <span class="func">eBayes</span>(fit)                                 <span class="comment"># moderated t</span>
+<span class="func">topTable</span>(fit, coef = <span class="str">"conditionKO"</span>, adjust = <span class="str">"BH"</span>)</pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python --- pydeseq2 + rpy2 fallback</span>
+<span class="kw">import</span> pandas <span class="kw">as</span> pd, numpy <span class="kw">as</span> np
+<span class="kw">from</span> pydeseq2.dds <span class="kw">import</span> DeseqDataSet
+<span class="kw">from</span> pydeseq2.ds <span class="kw">import</span> DeseqStats
+
+<span class="comment"># counts: genes × samples; metadata: samples × covariates</span>
+dds = DeseqDataSet(counts=counts.T, metadata=metadata, design_factors=[<span class="str">"batch"</span>,<span class="str">"condition"</span>])
+dds.deseq2()
+stats = DeseqStats(dds, contrast=[<span class="str">"condition"</span>,<span class="str">"KO"</span>,<span class="str">"WT"</span>])
+stats.summary()
+stats.lfc_shrink(coeff=<span class="str">"condition_KO_vs_WT"</span>)
+res = stats.results_df                                <span class="comment"># pandas DF</span>
+
+<span class="comment"># scRNA-seq: scanpy / decoupler</span>
+<span class="kw">import</span> scanpy <span class="kw">as</span> sc
+sc.tl.rank_genes_groups(adata, groupby=<span class="str">"cluster"</span>, method=<span class="str">"wilcoxon"</span>)
+<span class="comment"># 偽-bulk DE 仍推薦 DESeq2 / edgeR via rpy2</span>
+
+<span class="kw">from</span> rpy2.robjects <span class="kw">import</span> r, pandas2ri; pandas2ri.activate()
+r.assign(<span class="str">"counts"</span>, counts); r.assign(<span class="str">"cd"</span>, metadata)
+r(<span class="str">'library(edgeR); dge &lt;- DGEList(counts, group=cd$condition); ...'</span>)</pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>(1) 把<em>原始</em> LFC 用於熱圖排名 → 低 count 雜訊衝到前面 → 必須先 <code>lfcShrink</code>。(2) 先 ComBat 校正再做 DE → SE 失準 → 應該把批次放進 design。(3) 對低 count 基因 (count &lt; 10) 沒做獨立過濾就直接報 padj → BH 檢力被吃掉。(4) DESeq2 對單一複製 (n=1 vs n=1) 不會跑——它需要至少每組 n ≥ 2 才能估 dispersion。</span>
+<span data-lang="en"><strong>Common mistakes:</strong> (1) ranking heatmaps by <em>raw</em> LFC — low-count noise floods the top — always <code>lfcShrink</code> first. (2) ComBat-correcting before DE — SE breaks — put batch in the design instead. (3) Skipping independent filtering for low-count genes — wastes BH power. (4) DESeq2 won't run with single replicates (n=1 vs n=1) — at least n ≥ 2 per group is needed for dispersion estimation.</span>
+</div></div>
+</section>
+
+<!-- ===== QUIZ ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 為什麼 voom 需要對 RNA-seq counts 計算 precision weights，再交給 limma 的 Gaussian 工具？</p>
+<p data-lang="en">1. Why does voom precision-weight RNA-seq counts before feeding them into limma's Gaussian toolbox?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 因為 limma 不能處理多重檢定</span><span data-lang="en">A. Because limma cannot handle multiple testing</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 因為 voom 不能用於 RNA-seq</span><span data-lang="en">B. Because voom does not apply to RNA-seq</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 因為 log-CPM 後不同基因的變異仍隨平均不同；precision weights 把這個 mean-variance trend 內建到線性模型</span><span data-lang="en">C. Because after log-CPM, variance still depends on mean; precision weights encode this mean-variance trend into the linear model</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 因為 limma 需要整數輸入</span><span data-lang="en">D. Because limma requires integer input</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. edgeR 的 QL F 檢定與 DESeq2 的 Wald 檢定的主要實務差異？</p>
+<p data-lang="en">2. Practical difference between edgeR's QL F-test and DESeq2's Wald test?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 兩者用不同的虛無假設</span><span data-lang="en">A. They test different null hypotheses</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. QL F 用 quasi-likelihood 把 dispersion 不確定度納入分母，小樣本下 Type I 錯誤率較保守；Wald 在小樣本下偶爾過寬</span><span data-lang="en">B. QL F uses quasi-likelihood to embed dispersion uncertainty into its denominator, giving tighter Type I control at small n; Wald can be a touch liberal at small n</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. QL F 不需要校正多重檢定</span><span data-lang="en">C. QL F does not require multiple-testing correction</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. DESeq2 不能處理 batch effect</span><span data-lang="en">D. DESeq2 cannot adjust for batch effects</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">3. 為什麼用 fold change 排名基因時必須先做 <code>lfcShrink</code>？</p>
+<p data-lang="en">3. Why is <code>lfcShrink</code> essential when ranking genes by fold change?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. <code>lfcShrink</code> 可以同時做 FDR 校正</span><span data-lang="en">A. <code>lfcShrink</code> simultaneously performs FDR correction</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 沒有它 DESeq2 無法跑</span><span data-lang="en">B. DESeq2 will not run without it</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 低 count 基因的原始 LFC 變異極大，會被排到頂端造成「噴泉」雜訊；shrinkage 依不確定度收縮 LFC 還原可靠排名</span><span data-lang="en">C. Low-count genes have huge LFC variance and rise to the top as "fountain" noise; shrinkage tames LFC by its uncertainty, restoring a meaningful ranking</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. <code>lfcShrink</code> 會把 p-value 變更小</span><span data-lang="en">D. <code>lfcShrink</code> makes p-values smaller</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="multiple-testing-fdr.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 14: Multiple Testing & FDR</span></a>
+<a href="permutation-gsea.html" style="text-align:right"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 16: Permutation / GSEA</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// ---- Volcano: synthetic RNA-seq DE simulator ----
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function normCDF(z){return 0.5*(1+Math.sign(z)*Math.sqrt(1-Math.exp(-2*z*z/Math.PI)));}
+function pTwoSided(z){return 2*(1-normCDF(Math.abs(z)));}
+
+const NGENES=2500;
+let baseline=null;
+function buildBaseline(){
+  baseline=[];
+  for(let i=0;i<NGENES;i++){
+    // log-normal mean count
+    const mu=Math.exp(randn()*1.4+2.5);   // ~ exp(N(2.5,1.4))
+    baseline.push({mu,trueLFC:0});
+  }
+}
+buildBaseline();
+
+const volcano=new Chart(document.getElementById('volcano'),{type:'scatter',data:{datasets:[
+  {label:'non-DE',data:[],backgroundColor:'rgba(110,110,110,0.32)',pointRadius:1.6},
+  {label:'FDR < 5%',data:[],backgroundColor:'rgba(192,57,43,0.78)',pointRadius:2.6}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'log2 fold change'},min:-6,max:6},y:{title:{display:true,text:'−log10 p'},min:0}}}});
+
+function simulateDE(n,pctDE,doShrink){
+  const m=NGENES; const trueDE=Math.round(m*pctDE);
+  // assign true LFCs
+  const idx=Array.from({length:m},(_,i)=>i);
+  for(let i=idx.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}
+  for(let i=0;i<m;i++) baseline[i].trueLFC=0;
+  for(let i=0;i<trueDE;i++) baseline[idx[i]].trueLFC=(Math.random()<0.5?-1:1)*(1+Math.random()*2);
+  const pts=[]; const sig=[];
+  const ps=[];
+  // First pass: collect rawLFC and SE
+  const rawLFC=new Array(m), seArr=new Array(m), zArr=new Array(m);
+  for(let i=0;i<m;i++){
+    const mu=baseline[i].mu, t=baseline[i].trueLFC;
+    const muA=mu, muB=mu*Math.pow(2,t);
+    // simulate group means with NB-ish variance: var ≈ mu + 0.1 mu^2
+    const sdA=Math.sqrt((muA+0.1*muA*muA)/n);
+    const sdB=Math.sqrt((muB+0.1*muB*muB)/n);
+    const mA=Math.max(0.5,muA+randn()*sdA);
+    const mB=Math.max(0.5,muB+randn()*sdB);
+    const lfc=Math.log2(mB/mA);
+    // SE for lfc (delta-method-ish)
+    const se=Math.sqrt((sdA/mA)*(sdA/mA)+(sdB/mB)*(sdB/mB))/Math.LN2;
+    rawLFC[i]=lfc; seArr[i]=se;
+  }
+  // global LFC prior scale = MAD of rawLFC
+  const sorted=[...rawLFC].sort((a,b)=>a-b);
+  const med=sorted[Math.floor(m/2)];
+  const tauSorted=sorted.map(v=>Math.abs(v-med)).sort((a,b)=>a-b);
+  const mad=tauSorted[Math.floor(m/2)]*1.4826;
+  const tau2=Math.max(0.01,mad*mad);
+  for(let i=0;i<m;i++){
+    let lfcUse=rawLFC[i];
+    if(doShrink){
+      const w=tau2/(tau2+seArr[i]*seArr[i]); // James-Stein-ish
+      lfcUse=w*rawLFC[i];
+    }
+    const z=lfcUse/seArr[i];
+    zArr[i]=z;
+    const p=pTwoSided(z);
+    ps.push({i,p,lfc:lfcUse});
+  }
+  // BH FDR
+  ps.sort((a,b)=>a.p-b.p);
+  let kBH=0;
+  for(let r=m-1;r>=0;r--){if(ps[r].p<=(r+1)*0.05/m){kBH=r+1;break;}}
+  const sigSet=new Set();
+  for(let r=0;r<kBH;r++) sigSet.add(ps[r].i);
+  for(let i=0;i<m;i++){
+    const lfc=ps.find(x=>x.i===i)?undefined:undefined;
+  }
+  // build scatter data
+  const nonDE=[], sigPts=[];
+  ps.forEach(({i,p,lfc})=>{
+    const y=Math.min(20,-Math.log10(Math.max(p,1e-20)));
+    const x=Math.max(-6,Math.min(6,lfc));
+    if(sigSet.has(i)) sigPts.push({x,y}); else nonDE.push({x,y});
+  });
+  return {nonDE,sigPts,nSig:kBH};
+}
+
+function updateVolcano(){
+  const n=+document.getElementById('sliderN').value;
+  const pctDE=(+document.getElementById('sliderDE').value)/100;
+  const doShrink=document.getElementById('toggleShr').checked;
+  document.getElementById('valN').textContent=n;
+  document.getElementById('valDE').textContent=Math.round(pctDE*100);
+  const r=simulateDE(n,pctDE,doShrink);
+  volcano.data.datasets[0].data=r.nonDE;
+  volcano.data.datasets[1].data=r.sigPts;
+  volcano.update('none');
+  document.getElementById('statSig').textContent='DE @ FDR 5%: '+r.nSig;
+  document.getElementById('statN').textContent='n = '+n;
+  document.getElementById('statShr').textContent=doShrink?(I18n.get()==='zh'?'已收縮 LFC':'shrunken LFC'):(I18n.get()==='zh'?'原始 LFC':'raw LFC');
+  const hn=document.getElementById('hint-n'); if(hn) hn.textContent='每組 n='+n;
+  const hn2=document.getElementById('hint-n2'); if(hn2) hn2.textContent='n='+n+' per group';
+}
+['sliderN','sliderDE','toggleShr'].forEach(id=>{const el=document.getElementById(id);el.addEventListener(id==='toggleShr'?'change':'input',updateVolcano);});
+document.addEventListener('langchange',updateVolcano);
+updateVolcano();
+
+// Quiz
+const QF={
+  zh:{q1_y:'即便 log-CPM 後，count 仍呈 mean-variance trend；voom 的 precision weights 把這個關係內建進線性模型。',q1_n:'正確答案已標示。',q2_y:'QL F 把 dispersion 不確定度納入分母；小樣本 (n=3) 它的 Type I 較穩，Wald 偶爾過寬。',q2_n:'正確答案已標示。',q3_y:'低 count 基因的原始 LFC 雜訊大，<code>lfcShrink</code> 依不確定度收縮，產生穩定排名。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'Even after log-CPM, counts retain a mean-variance trend; voom encodes this via precision weights.',q1_n:'Correct answer highlighted.',q2_y:'QL F embeds dispersion uncertainty in its denominator, controlling Type I at small n; Wald can be liberal there.',q2_n:'Correct answer highlighted.',q3_y:'Low-count genes have noisy raw LFCs; <code>lfcShrink</code> tames them by uncertainty, yielding stable rankings.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.innerHTML=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

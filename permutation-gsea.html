@@ -1,0 +1,369 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 16: Permutation, Bootstrap, GSEA — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html" class="active">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 16 / 17</div>
+<h1 data-zh="排列、Bootstrap、GSEA" data-en="Permutation, Bootstrap, GSEA">排列、Bootstrap、GSEA</h1>
+<p class="subtitle" data-lang="zh">當參數假設失效或統計量沒有閉合分布時，重抽樣（resampling）是最可靠的工具。本章把排列檢定、bootstrap、基因集富集（GSEA）整合成一個 resampling 工具箱。</p>
+<p class="subtitle" data-lang="en">When parametric assumptions break or no closed-form null exists, resampling is the most reliable tool. This chapter unifies permutation tests, bootstrap, and gene-set enrichment (GSEA) into one resampling toolkit.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== OVERVIEW ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為何在生信中重抽樣是必要技能" data-en="Why resampling matters in bioinformatics">為何在生信中重抽樣是必要技能</h2>
+<div data-lang="zh">
+<p>許多生物資料分析的統計量並沒有漂亮的閉合分布：基因集富集分數 (ES)、網絡中介中心度、scRNA-seq 軌跡距離、複雜的 ratio 與 trimmed mean——這些都很難套教科書的 t/F 分布。<strong>重抽樣</strong>用「資料本身」生成虛無分布或不確定度估計，繞過參數假設：</p>
+<ul>
+<li><strong>排列檢定</strong>：在 H₀ 下「標籤可交換」，重複洗牌組標籤，計算每次的統計量，比較觀察值與這些排列值——黃金標準的 FWER / FDR 控制。</li>
+<li><strong>Bootstrap</strong>：從原資料抽樣（with replacement），重複計算統計量得其抽樣分布——拿來算 SE、CI、bias。</li>
+<li><strong>GSEA</strong>：以「樣本標籤排列」對排序後的基因清單做 KS-like 富集檢定——是排列檢定在生物路徑層級的應用。</li>
+</ul>
+</div>
+<div data-lang="en">
+<p>Many biological statistics lack a closed-form distribution: GSEA enrichment scores, network betweenness, scRNA-seq trajectory distances, complex ratios and trimmed means — none fit textbook t / F. <strong>Resampling</strong> uses the data itself to generate a null or an uncertainty estimate, bypassing parametric assumptions:</p>
+<ul>
+<li><strong>Permutation tests</strong>: under H₀ labels are exchangeable; shuffle labels repeatedly, recompute the statistic, compare the observed value to the permutation distribution — gold-standard FWER / FDR control.</li>
+<li><strong>Bootstrap</strong>: resample <em>with replacement</em> from the data; recompute the statistic to obtain its sampling distribution — gives SE, CI, bias.</li>
+<li><strong>GSEA</strong>: applies sample-label permutation to a KS-like enrichment score on a ranked gene list — permutation testing at the pathway level.</li>
+</ul>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>選擇原則：</strong>檢定 H₀ → 排列；估計 SE / CI → bootstrap。兩者用法不可互換。Bootstrap 的 CI 並不保證 Type I 控制；排列的不確定度不能直接拿來當 SE。</span>
+<span data-lang="en"><strong>How to choose:</strong> testing H₀ → permutation; estimating SE / CI → bootstrap. They are NOT interchangeable. A bootstrap CI does not guarantee Type I control; permutation does not directly give a SE.</span>
+</div></div>
+</section>
+
+<!-- ===== CORE CONCEPTS ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、排列檢定與 Bootstrap" data-en="I. Permutation & Bootstrap">一、排列檢定與 Bootstrap</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">🔀</div><h4 data-zh="排列檢定 (permutation)" data-en="Permutation Test">排列檢定 (permutation)</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>H₀：兩組來自<em>同一分布</em>，組別標籤可交換。</li>
+<li>洗牌標籤 B 次，每次重算統計量 → 得到虛無分布。</li>
+<li>p = (<em>未來</em>排列中 ≥ 觀察值的比例)。</li>
+<li>對小樣本、非常態資料、自訂統計量都有效。</li>
+<li>限制：n 太小 → 排列數有限 → p 無法低於 1/(B+1)。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>H₀: both groups come from the <em>same</em> distribution; labels are exchangeable.</li>
+<li>Shuffle labels B times, recompute the statistic → null distribution.</li>
+<li>p = (fraction of permutations ≥ observed value).</li>
+<li>Works for small samples, non-normal data, custom statistics.</li>
+<li>Caveat: very small n → few unique permutations → p cannot go below 1/(B+1).</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🥾</div><h4>Bootstrap</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>從原資料抽 n 個（with replacement），重複 B 次。</li>
+<li>得到統計量的<strong>經驗抽樣分布</strong>，可算 SE、percentile CI、BCa CI。</li>
+<li>適用：複雜統計量（中介效應、變異成分、網絡度量）、無 SE 公式的場合。</li>
+<li>需大量重抽樣（≥1000）；可能在尾端表現不佳。</li>
+<li>對相依資料用 <em>block bootstrap</em> 或 <em>cluster bootstrap</em>。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Sample n observations <em>with replacement</em> from the data; repeat B times.</li>
+<li>Yields the <strong>empirical sampling distribution</strong>: SE, percentile CI, BCa CI.</li>
+<li>Use for: complex statistics (mediation, variance components, network metrics) where no SE formula exists.</li>
+<li>Needs many resamples (≥1000); tail behaviour can be poor.</li>
+<li>For dependent data use <em>block</em> or <em>cluster</em> bootstrap.</li>
+</ul></div>
+</div>
+</div>
+
+<h2 data-zh="二、GSEA：排序基因清單上的富集檢定" data-en="II. GSEA: Enrichment on a Ranked Gene List">二、GSEA 與基因集檢定</h2>
+
+<div data-lang="zh">
+<p>把所有基因按某個統計量（log fold change、moderated t、signal-to-noise）排序，<strong>GSEA</strong> 的問題是：某條基因集 S（例如 Hallmark INTERFERON_ALPHA）的成員，是否「集中在排序的上端或下端」？</p>
+<p><strong>Running Enrichment Score (ES)</strong>：從上而下掃描排序清單，遇到 S 的成員就加分（依排序值加權），遇到非成員就減分。ES = 全程偏離 0 的最大絕對值。<strong>顯著性</strong>由樣本標籤排列得到——重新洗組別→重排基因→重算 ES→得 ES 虛無分布。</p>
+<p><strong>兩種對立的虛無：</strong>(a) <strong>self-contained</strong>（如 <code>roast</code>）—— H₀：S 中無基因有差異表現。(b) <strong>competitive</strong>（如 GSEA、<code>camera</code>）—— H₀：S 中的基因「比 S 外的基因更顯著」。生物學家通常想要 competitive，因為它回答「這條 pathway 比背景更被擾動嗎？」。</p>
+<p><strong>ORA</strong>（Over-Representation Analysis，hypergeometric / Fisher）用 DE 基因清單對基因集的交集做超幾何檢定——速度快，但忽略了排序、丟失了亞顯著的累積訊號，且不處理基因間相關性。<code>camera / roast</code> 校正了相關性；<code>fgsea</code> 用適應性排列大幅加速。</p>
+</div>
+<div data-lang="en">
+<p>Rank all genes by a statistic (log fold change, moderated t, signal-to-noise). <strong>GSEA</strong> asks: do the members of a gene set S (e.g. Hallmark INTERFERON_ALPHA) cluster at the top or bottom of this ranking?</p>
+<p><strong>Running Enrichment Score (ES)</strong>: walk the ranked list top to bottom; add to a running sum at each S member (weighted by rank value), subtract at non-members. ES is the maximum absolute deviation from 0. <strong>Significance</strong> comes from <em>sample-label</em> permutation — shuffle group labels → re-rank genes → recompute ES → build an ES null distribution.</p>
+<p><strong>Two competing nulls:</strong> (a) <strong>self-contained</strong> (e.g. <code>roast</code>) — H₀: no gene in S is differentially expressed. (b) <strong>competitive</strong> (e.g. GSEA, <code>camera</code>) — H₀: genes in S are no more differential than genes outside S. Biologists usually want the competitive null because it answers "is this pathway more perturbed than background?".</p>
+<p><strong>ORA</strong> (Over-Representation Analysis, hypergeometric / Fisher's exact) computes the overlap of a DE gene list with a set — fast, but ignores ranking, loses sub-significant accumulating signal, and ignores inter-gene correlation. <code>camera / roast</code> correct for correlation; <code>fgsea</code> uses adaptive permutation for huge speedups.</p>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>樣本 vs 基因排列：</strong>GSEA 預設用<em>樣本標籤排列</em>——保留基因間相關性，是正確的虛無。<em>基因排列</em>（隨機洗基因 ID）會破壞 pathway 內基因間共變異，膨脹 ES 顯著性、產生大量假陽性。當樣本太少（n &lt; 8）以致排列數不足時，採用 <code>fgsea</code> 的 gamma 近似或 <code>roast</code> 的旋轉檢定。</div>
+<div data-lang="en"><strong>Sample vs gene permutation:</strong> GSEA's default is <em>sample-label</em> permutation — it preserves inter-gene correlation and is the correct null. <em>Gene-set permutation</em> (shuffling gene IDs) destroys within-pathway correlation, inflates ES significance, and floods false positives. When n is too small (n &lt; 8) for enough sample permutations, use <code>fgsea</code>'s gamma approximation or <code>roast</code>'s rotation test.</div>
+</div></div>
+
+<h2 data-zh="三、計算捷徑與生信現場" data-en="III. Computational shortcuts & real-world use">三、計算捷徑</h2>
+
+<div data-lang="zh">
+<p>對 m=20,000 基因 × 1,000 排列 = 2×10⁷ 次測試，naive 實作會在 2026 年也跑很久。常用加速：</p>
+<ul>
+<li><code>fgsea::fgsea</code>：用 adaptive multilevel 排列，把 p &lt; 10⁻⁶ 的 pathway 也能精準估計。</li>
+<li><code>limma::camera</code>：用 inter-gene correlation 解析調整 t 統計量，無須排列。</li>
+<li><code>roast</code> / <code>mroast</code>：用<em>旋轉檢定</em>（rotation test）取代排列——適合 n ≥ 3 的小樣本。</li>
+<li>SAM (Significance Analysis of Microarrays)：對排列得到的虛無分布做 FDR——早期但仍實用。</li>
+<li>permutation-based GWAS p-value：對表型排列以校正 LD 結構。</li>
+</ul>
+</div>
+<div data-lang="en">
+<p>For m = 20,000 genes × 1,000 permutations = 2×10⁷ tests, naive code would still be slow in 2026. Standard accelerations:</p>
+<ul>
+<li><code>fgsea::fgsea</code>: adaptive multilevel permutation — accurately estimates p &lt; 10⁻⁶ for top pathways.</li>
+<li><code>limma::camera</code>: analytic correction using inter-gene correlation — no permutation needed.</li>
+<li><code>roast</code> / <code>mroast</code>: rotation test replaces permutation — viable for n ≥ 3.</li>
+<li>SAM: early FDR-via-permutation method, still useful.</li>
+<li>Permutation GWAS p-values: phenotype permutation to retain LD structure.</li>
+</ul>
+</div>
+</section>
+
+<!-- ===== INTERACTIVE ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="GSEA 互動：滾動排序清單看 running ES 與排列虛無" data-en="GSEA Interactive: running ES and permutation null">GSEA：滾動 ES 與排列虛無</h2>
+<div data-lang="zh"><p>下方是合成的 500 基因排序清單，目標基因集（綠色標記）共 30 個成員，集中於上端。<strong>running ES</strong> 沿排序累積：紅曲線上揚＝集合的「命中」加分，下落＝「未命中」減分。調整<code>集中強度</code> 與 <code>n_perm</code>，右下小圖即時更新排列虛無，黑線為觀察 ES，紅虛線為 p &lt; 0.05 閾值。</p></div>
+<div data-lang="en"><p>Below is a synthetic ranked list of 500 genes; the target gene set (green marks) has 30 members concentrated near the top. The <strong>running ES</strong> walks the list: red rises at "hits", falls at "misses". Adjust <code>concentration</code> and <code>n_perm</code>; the inset updates the permutation null in real time — black line is observed ES, red dashed line is the p = 0.05 quantile.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats">
+  <span class="sim-stat pass" id="statES">ES —</span>
+  <span class="sim-stat pass" id="statP">p —</span>
+  <span class="sim-stat fail" id="statNPerm">B —</span>
+</div>
+<div class="slider-group"><label><span data-zh="集中強度 (集合往清單上端的程度)" data-en="Concentration of set toward top">集中強度</span> <span id="valConc">0.80</span></label><input type="range" id="sliderConc" min="0" max="100" value="80" step="1"></div>
+<div class="slider-group"><label><span data-zh="排列次數 B" data-en="Permutations B">B</span> <span id="valB">500</span></label><input type="range" id="sliderB" min="100" max="2000" value="500" step="100"></div>
+<div class="chart-container"><canvas id="gseaChart"></canvas></div>
+<div class="chart-container" style="height:140px;margin-top:12px"><canvas id="permChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="主圖：running ES（紅）+ 命中位置（綠線）" data-en="Main: running ES (red) + hit positions (green ticks)">主圖：running ES（紅）+ 命中位置（綠線）</span> · <span data-zh="副圖：排列下 ES 虛無分布" data-en="Inset: permutation null of ES">副圖：排列下 ES 虛無分布</span></p>
+</div>
+</section>
+
+<!-- ===== CODE ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：fgsea、camera、boot、permutation_test" data-en="Code: fgsea, camera, boot, permutation_test">實作</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- 排列 / Bootstrap / GSEA</span>
+
+<span class="comment"># 1) 自製排列檢定（兩組均值差）</span>
+obs &lt;- <span class="func">mean</span>(x[g==<span class="str">"A"</span>]) - <span class="func">mean</span>(x[g==<span class="str">"B"</span>])
+perm &lt;- <span class="func">replicate</span>(<span class="num">10000</span>, {
+  gp &lt;- <span class="func">sample</span>(g)
+  <span class="func">mean</span>(x[gp==<span class="str">"A"</span>]) - <span class="func">mean</span>(x[gp==<span class="str">"B"</span>])
+})
+<span class="func">mean</span>(<span class="func">abs</span>(perm) &gt;= <span class="func">abs</span>(obs))             <span class="comment"># two-sided p</span>
+
+<span class="comment"># 2) Bootstrap CI of a complex statistic</span>
+<span class="func">library</span>(boot)
+b &lt;- <span class="func">boot</span>(data, statistic = function(d, i) <span class="func">cor</span>(d[i,<span class="num">1</span>], d[i,<span class="num">2</span>]), R = <span class="num">2000</span>)
+<span class="func">boot.ci</span>(b, type = <span class="func">c</span>(<span class="str">"perc"</span>, <span class="str">"bca"</span>))
+
+<span class="comment"># 3) fgsea — fast GSEA on ranked stats</span>
+<span class="func">library</span>(fgsea); <span class="func">library</span>(msigdbr)
+pathways &lt;- <span class="func">split</span>(msigdbr_df$gene_symbol, msigdbr_df$gs_name)
+ranked   &lt;- <span class="func">setNames</span>(res$stat, res$gene)               <span class="comment"># named numeric</span>
+fg &lt;- <span class="func">fgsea</span>(pathways, stats = ranked, minSize=<span class="num">15</span>, maxSize=<span class="num">500</span>)
+<span class="func">head</span>(fg[<span class="func">order</span>(fg$padj), ], <span class="num">10</span>)
+
+<span class="comment"># 4) limma::camera / roast — correlation-aware</span>
+<span class="func">library</span>(limma)
+idx &lt;- <span class="func">ids2indices</span>(pathways, <span class="func">rownames</span>(v$E))
+<span class="func">camera</span>(v, idx, design, contrast = cont)
+<span class="func">mroast</span>(v, idx, design, contrast = cont, nrot = <span class="num">9999</span>)
+
+<span class="comment"># 5) ORA（hypergeometric / Fisher）</span>
+<span class="func">library</span>(clusterProfiler)
+<span class="func">enrichGO</span>(de_genes, OrgDb=<span class="str">"org.Hs.eg.db"</span>, ont=<span class="str">"BP"</span>, pAdjustMethod=<span class="str">"BH"</span>)</pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">from</span> scipy <span class="kw">import</span> stats
+
+<span class="comment"># 1) scipy permutation_test — vectorised, exact when feasible</span>
+<span class="kw">def</span> <span class="func">mean_diff</span>(a, b): <span class="kw">return</span> a.mean() - b.mean()
+res = stats.permutation_test((x_A, x_B), mean_diff, n_resamples=<span class="num">10000</span>,
+                             alternative=<span class="str">"two-sided"</span>, permutation_type=<span class="str">"independent"</span>)
+res.statistic, res.pvalue
+
+<span class="comment"># 2) Bootstrap CI</span>
+res = stats.bootstrap((x,), np.median, n_resamples=<span class="num">2000</span>, method=<span class="str">"BCa"</span>)
+res.confidence_interval
+
+<span class="comment"># 3) GSEA via gseapy</span>
+<span class="kw">import</span> gseapy <span class="kw">as</span> gp
+pre = gp.prerank(rnk=ranked_df, gene_sets=<span class="str">"MSigDB_Hallmark_2020"</span>,
+                 min_size=<span class="num">15</span>, max_size=<span class="num">500</span>, permutation_num=<span class="num">1000</span>)
+pre.res2d.sort_values(<span class="str">"NOM p-val"</span>).head(<span class="num">10</span>)
+
+<span class="comment"># 4) Hypergeometric ORA</span>
+gp.enrichr(gene_list=de_genes, gene_sets=<span class="str">"GO_Biological_Process_2023"</span>)
+
+<span class="comment"># 5) Block permutation (for time-series / clustered data)</span>
+<span class="kw">def</span> <span class="func">block_perm</span>(x, block_size, B):
+    blocks = x.reshape(-<span class="num">1</span>, block_size)
+    out = []
+    <span class="kw">for</span> _ <span class="kw">in</span> range(B):
+        idx = np.random.permutation(blocks.shape[<span class="num">0</span>])
+        out.append(blocks[idx].ravel())
+    <span class="kw">return</span> np.array(out)</pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>(1) 用<em>基因排列</em>跑 GSEA — 破壞相關性結構、假陽性爆增。(2) n=3 vs 3 跑只有 20 種唯一排列，卻報 p = 0.001 — 這個 p 不可能存在。(3) 把 bootstrap percentile CI 直接拿來宣稱「95% Type I 控制」— bootstrap 是估計工具，不是檢定。(4) ORA 用「padj &lt; 0.05」的 DE 基因清單跑 — 對小研究幾乎沒結果；GSEA 用全部排序基因更穩健。</span>
+<span data-lang="en"><strong>Common mistakes:</strong> (1) Using <em>gene</em> permutation in GSEA — destroys correlation, inflates false positives. (2) n=3 vs 3 has only 20 unique permutations, yet reporting p = 0.001 — that p is impossible. (3) Using a bootstrap percentile CI as a "95% Type I" claim — bootstrap estimates uncertainty, not error rate. (4) ORA over the "padj &lt; 0.05" DE list — yields nothing in underpowered studies; GSEA over the full ranking is more robust.</span>
+</div></div>
+</section>
+
+<!-- ===== QUIZ ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 為什麼樣本標籤排列得到的 GSEA p-value 比基因排列的更保守、更可信？</p>
+<p data-lang="en">1. Why does sample-label permutation yield a more conservative and reliable GSEA p-value than gene-set permutation?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 樣本排列計算速度更慢</span><span data-lang="en">A. Sample permutation runs more slowly</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 樣本排列只測試 H₀ 的一部分</span><span data-lang="en">B. Sample permutation only tests part of H₀</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 樣本排列保留基因間的相關結構；基因排列破壞共變異，讓 ES 的虛無太窄、p 太小</span><span data-lang="en">C. Sample permutation preserves inter-gene correlation; gene permutation destroys it, making the ES null too narrow and p-values too small</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 樣本排列不需要 FDR 校正</span><span data-lang="en">D. Sample permutation requires no FDR correction</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. 何種情境下，bootstrap 比排列檢定更合適？</p>
+<p data-lang="en">2. When is the bootstrap preferable to a permutation test?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 要嚴格控制 Type I 錯誤率</span><span data-lang="en">A. When strict Type I control is required</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 要估計複雜統計量的 SE / CI（沒有自然「可交換標籤」可洗牌）</span><span data-lang="en">B. When estimating SE / CI for a complex statistic (no natural exchangeable labels to permute)</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 樣本量極小（n=3）</span><span data-lang="en">C. With extremely small samples (n=3)</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 兩者完全可互換</span><span data-lang="en">D. The two are completely interchangeable</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">3. Competitive 基因集檢定（如 GSEA、camera）與 self-contained（如 roast）的本質差別？</p>
+<p data-lang="en">3. The essential difference between competitive (GSEA, camera) and self-contained (roast) gene-set tests?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. competitive 只能用排列；self-contained 必須用旋轉</span><span data-lang="en">A. Competitive must use permutation; self-contained must use rotation</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. competitive 只適用單樣本；self-contained 適用兩樣本</span><span data-lang="en">B. Competitive only fits one-sample designs; self-contained fits two-sample designs</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. competitive 問「S 中基因比 S 外更顯著嗎？」；self-contained 問「S 中至少一個基因有差異嗎？」</span><span data-lang="en">C. Competitive asks "are S members more differential than non-S?"; self-contained asks "is any gene in S differentially expressed?"</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. competitive 不能校正基因間相關</span><span data-lang="en">D. Competitive cannot correct for inter-gene correlation</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="de-statistics.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 15: DE Statistics</span></a>
+<a href="survival-analysis.html" style="text-align:right"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 17: Survival Analysis</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// ---- GSEA simulator ----
+const NTOT=500, NSET=30;
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function buildRanking(concentration){
+  // Generate stat values (descending), assign set membership: more set members at top with prob = concentration
+  const stats=[]; for(let i=0;i<NTOT;i++) stats.push(3-i*6/NTOT+randn()*0.2);
+  // Pick set members: weighted by exp(-rank*conc)
+  const probs=stats.map((_,i)=>Math.exp(-i*(0.6+concentration*0.04)/NTOT*8));
+  const sumP=probs.reduce((a,b)=>a+b,0); for(let i=0;i<probs.length;i++) probs[i]/=sumP;
+  const inSet=new Array(NTOT).fill(false); let chosen=0; const used=new Set();
+  while(chosen<NSET){
+    const r=Math.random(); let acc=0,pick=-1;
+    for(let i=0;i<NTOT;i++){acc+=probs[i];if(r<=acc){pick=i;break;}}
+    if(pick<0) pick=Math.floor(Math.random()*NTOT);
+    if(!used.has(pick)){used.add(pick);inSet[pick]=true;chosen++;}
+  }
+  return {stats,inSet};
+}
+
+function runningES(inSet, stats){
+  const N=stats.length, Nh=inSet.filter(Boolean).length;
+  let sumW=0; for(let i=0;i<N;i++) if(inSet[i]) sumW+=Math.abs(stats[i]);
+  const phit=1/Math.max(sumW,1e-6), pmiss=1/(N-Nh);
+  let run=0,maxAbs=0,maxVal=0; const arr=[];
+  for(let i=0;i<N;i++){
+    run += inSet[i] ? Math.abs(stats[i])*phit : -pmiss;
+    arr.push(run);
+    if(Math.abs(run)>maxAbs){maxAbs=Math.abs(run);maxVal=run;}
+  }
+  return {arr,ES:maxVal};
+}
+
+function permutationNullES(inSet, stats, B){
+  const N=stats.length;
+  const nullES=[];
+  for(let b=0;b<B;b++){
+    // shuffle set membership randomly
+    const sh=new Array(N).fill(false); const used=new Set(); let c=0;
+    while(c<NSET){const i=Math.floor(Math.random()*N);if(!used.has(i)){used.add(i);sh[i]=true;c++;}}
+    nullES.push(runningES(sh,stats).ES);
+  }
+  return nullES;
+}
+
+const gseaChart=new Chart(document.getElementById('gseaChart'),{type:'line',data:{labels:[],datasets:[
+  {label:'running ES',data:[],borderColor:'rgba(192,57,43,0.95)',backgroundColor:'rgba(192,57,43,0.10)',pointRadius:0,borderWidth:2,tension:0.05,fill:true},
+  {label:'hits',data:[],type:'scatter',borderColor:'rgba(26,107,90,0.85)',backgroundColor:'rgba(26,107,90,0.85)',pointRadius:3,showLine:false}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'}},scales:{x:{title:{display:true,text:'rank (top → bottom)'}},y:{title:{display:true,text:'running ES'}}}}});
+
+const permChart=new Chart(document.getElementById('permChart'),{type:'bar',data:{labels:[],datasets:[
+  {label:'null ES distribution',data:[],backgroundColor:'rgba(120,120,120,0.5)'},
+  {label:'observed ES',data:[],type:'line',borderColor:'rgba(0,0,0,0.9)',borderWidth:2,pointRadius:0}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:true,title:{display:true,text:'ES'}},y:{display:false}}}});
+
+function updateGSEA(){
+  const conc=+document.getElementById('sliderConc').value;
+  const B=+document.getElementById('sliderB').value;
+  document.getElementById('valConc').textContent=(conc/100).toFixed(2);
+  document.getElementById('valB').textContent=B;
+  const {stats,inSet}=buildRanking(conc);
+  const {arr,ES}=runningES(inSet,stats);
+  // Main chart
+  const labels=arr.map((_,i)=>i+1);
+  gseaChart.data.labels=labels;
+  gseaChart.data.datasets[0].data=arr;
+  const hits=[]; for(let i=0;i<inSet.length;i++) if(inSet[i]) hits.push({x:i+1,y:arr[i]});
+  gseaChart.data.datasets[1].data=hits;
+  gseaChart.update('none');
+
+  // Permutation null
+  const nullES=permutationNullES(inSet,stats,B);
+  const p=(nullES.filter(v=>Math.abs(v)>=Math.abs(ES)).length+1)/(B+1);
+  // Build histogram
+  const bins=24, minV=Math.min(...nullES,ES), maxV=Math.max(...nullES,ES);
+  const w=(maxV-minV)/bins+1e-9; const hist=new Array(bins).fill(0);
+  nullES.forEach(v=>{const k=Math.min(bins-1,Math.max(0,Math.floor((v-minV)/w)));hist[k]++;});
+  permChart.data.labels=hist.map((_,i)=>(minV+(i+0.5)*w).toFixed(2));
+  permChart.data.datasets[0].data=hist;
+  // observed ES line via dataset: mark bin
+  const obsBin=Math.min(bins-1,Math.max(0,Math.floor((ES-minV)/w)));
+  const obsArr=hist.map((_,i)=>i===obsBin?Math.max(...hist):null);
+  permChart.data.datasets[1].data=obsArr;
+  permChart.update('none');
+
+  document.getElementById('statES').textContent='ES = '+ES.toFixed(3);
+  document.getElementById('statP').textContent='p = '+p.toFixed(4);
+  document.getElementById('statNPerm').textContent='B = '+B;
+}
+['sliderConc','sliderB'].forEach(id=>document.getElementById(id).addEventListener('input',updateGSEA));
+document.addEventListener('langchange',updateGSEA);
+updateGSEA();
+
+// Quiz
+const QF={
+  zh:{q1_y:'樣本排列保留基因間相關；基因排列洗散這個結構，使 ES 虛無變窄 → 假陽性飆升。',q1_n:'正確答案已標示。',q2_y:'Bootstrap 強項是估計變異與 CI；它不是檢定工具。',q2_n:'正確答案已標示。',q3_y:'Competitive：S 比 S 外更顯著嗎？Self-contained：S 內任一基因是否有差異？兩者問的是不同 H₀。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'Sample permutation preserves inter-gene correlation; gene permutation destroys it, narrowing the null and inflating false positives.',q1_n:'Correct answer highlighted.',q2_y:'Bootstrap excels at variance and CI estimation, not hypothesis testing.',q2_n:'Correct answer highlighted.',q3_y:'Competitive: are S members more differential than non-S? Self-contained: is any gene in S differential? — different nulls.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

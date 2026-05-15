@@ -1,0 +1,339 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 7: ANOVA, ANCOVA &amp; Mixed Models — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html" class="active">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 7 / 17</div>
+<h1 data-zh="ANOVA、ANCOVA、混合效應模型" data-en="ANOVA, ANCOVA, Mixed Models">ANOVA、ANCOVA、混合效應模型</h1>
+<p class="subtitle" data-lang="zh">從「比較多組平均」走向「在批次、subject、重複內共享資訊」——多層次資料的標準語言。</p>
+<p class="subtitle" data-lang="en">From "comparing several group means" to "sharing information across batches, subjects, replicates" — the lingua franca of multi-level data.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Overview ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="ANOVA 是線性模型的特例" data-en="ANOVA is a special case of the linear model">ANOVA 是線性模型的特例</h2>
+<div data-lang="zh">
+<p>「為什麼分開教 ANOVA？」其實 <strong>ANOVA = 用類別變數做 X 的線性迴歸</strong>。F 檢定把總變異拆解成「組間 + 組內」，問「組間變異是否顯著大於組內」。一旦理解這個身分，<strong>ANCOVA</strong>（加入連續共變數）、<strong>repeated measures</strong>、<strong>mixed models</strong>都是這個框架的自然延伸。</p>
+<p>真正能讓 bioinformatician 與其他人拉開差距的是 <strong>混合效應模型 (mixed models)</strong>：當資料有<em>批次、subject、複製</em>等多層結構時，固定效應模型要嘛假裝它們不存在（錯）、要嘛吃掉所有自由度（浪費），而混合模型用<strong>隨機效應</strong>把這些變異來源建模成<em>分布</em>，達成<strong>部分匯聚 (partial pooling)</strong>。</p>
+</div>
+<div data-lang="en">
+<p>"Why teach ANOVA separately?" — in fact <strong>ANOVA = linear regression with categorical X</strong>. The F-test partitions variance into "between + within" and asks if between exceeds within. Once you see this identity, <strong>ANCOVA</strong> (add continuous covariates), <strong>repeated measures</strong>, and <strong>mixed models</strong> all become natural extensions.</p>
+<p>What separates bioinformaticians from the pack is <strong>mixed-effects modeling</strong>: when data have <em>batch, subject, replicate</em> structure, a purely fixed-effects model either ignores them (wrong) or burns df on them (wasteful). Mixed models treat these variance sources as <strong>random effects</strong> drawn from a distribution — yielding <strong>partial pooling</strong>.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>判別準則：</strong>把因子當<strong>固定</strong>還是<strong>隨機</strong>？若該因子的特定 levels 本身有興趣（treatment = drug A vs B）→ 固定；若這些 levels 是更大母體的可<em>交換</em>樣本（batch 1, 2, ..., 8 → 未來還會有更多）→ 隨機。</span>
+<span data-lang="en"><strong>Rule of thumb:</strong> fixed vs random? If you care about the specific levels themselves (treatment = drug A vs B) → fixed. If they are exchangeable samples from a larger population (batch 1, 2, ..., 8 → there will be more) → random.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、從 ANOVA 到混合模型" data-en="I. From ANOVA to Mixed Models">一、從 ANOVA 到混合模型</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">📦</div><h4 data-zh="ANOVA 與 Type I/II/III SS" data-en="ANOVA &amp; Type I/II/III SS">ANOVA 與 SS 類型</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>F = MS<sub>between</sub> / MS<sub>within</sub></li>
+<li><strong>Type I</strong>（序列）：依輸入順序，結果隨順序變</li>
+<li><strong>Type II</strong>（邊際）：適合無交互作用</li>
+<li><strong>Type III</strong>（part. SS）：失衡資料的標準選擇 (<code>car::Anova(., type=3)</code>)</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>F = MS<sub>between</sub> / MS<sub>within</sub></li>
+<li><strong>Type I</strong> (sequential): order-dependent</li>
+<li><strong>Type II</strong> (marginal): for no-interaction models</li>
+<li><strong>Type III</strong> (partial SS): standard for unbalanced designs (<code>car::Anova(., type=3)</code>)</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">📏</div><h4 data-zh="ANCOVA：調整共變數的組比較" data-en="ANCOVA: Group Comparison Adjusted">ANCOVA：調整後比較</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><code>lm(y ~ group + covariate)</code>：在共變數下比較組均值</li>
+<li>關鍵：先檢查 group × covariate <strong>交互</strong>是否顯著（平行斜率假設）</li>
+<li>批次、性別、年齡、library size 都是 ANCOVA 的常見共變數</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><code>lm(y ~ group + covariate)</code>: compare group means at common covariate value</li>
+<li>Always check group × covariate <strong>interaction</strong> first (parallel-slopes assumption)</li>
+<li>Batch, sex, age, library size — typical ANCOVA covariates</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🎲</div><h4 data-zh="隨機 vs 固定效應" data-en="Random vs Fixed Effects">隨機 vs 固定</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>固定：估計每個 level；隨機：估計 levels 的<em>變異 σ²</em></li>
+<li>隨機允許「未來新 level」的推廣</li>
+<li>常見隨機效應：batch、subject、site、family</li>
+<li>公式：<code>(1|batch)</code> 隨機截距；<code>(slope|subject)</code> 隨機斜率</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Fixed: estimate each level; random: estimate variance σ² <em>of levels</em></li>
+<li>Random enables generalization to new levels</li>
+<li>Typical random effects: batch, subject, site, family</li>
+<li>Formula: <code>(1|batch)</code> random intercept; <code>(slope|subject)</code> random slope</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🌊</div><h4 data-zh="部分匯聚 (Partial Pooling)" data-en="Partial Pooling (Shrinkage)">部分匯聚</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>No pooling = 每組獨立估計（雜訊大）</li>
+<li>Complete pooling = 全體共用均值（偏誤大）</li>
+<li>Partial pooling = 各組均值<strong>朝整體均值收縮</strong>，收縮量依各組樣本數與群間變異決定</li>
+<li>這就是 BLUP（Best Linear Unbiased Predictor）</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>No pooling = each group estimated independently (high variance)</li>
+<li>Complete pooling = one grand mean (high bias)</li>
+<li>Partial pooling = group means <strong>shrunk toward the grand mean</strong>, by amount depending on n and between-group variance</li>
+<li>This is the BLUP (Best Linear Unbiased Predictor)</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>REML vs ML、p-value 爭議：</strong>① 混合模型用 <strong>REML</strong> 估計變異成分（更小偏誤），但比較<em>固定效應結構</em>不同的模型要用 <strong>ML</strong>。② <code>lme4::lmer</code> 故意不給 p-value——分母自由度在不平衡資料下沒有閉式解。解法：用 <code>lmerTest</code> (Satterthwaite) 或 <code>pbkrtest</code> (Kenward-Roger)。③ <strong>singular fit</strong> 警告：某個變異成分被估在 0 邊界——簡化隨機結構（移除隨機斜率或互動）。</div>
+<div data-lang="en"><strong>REML vs ML, and the p-value controversy:</strong> ① Mixed models use <strong>REML</strong> for variance components (less bias), but to compare models with different <em>fixed</em> structure switch to <strong>ML</strong>. ② <code>lme4::lmer</code> deliberately withholds p-values — there is no closed-form denominator df in unbalanced designs. Fix: <code>lmerTest</code> (Satterthwaite) or <code>pbkrtest</code> (Kenward-Roger). ③ <strong>Singular fit</strong> warning: a variance component is estimated at zero — simplify the random structure (drop random slopes or correlations).</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="No / Complete / Partial Pooling 視覺化" data-en="No / Complete / Partial Pooling Visualized">三種匯聚方式視覺化</h2>
+<div data-lang="zh"><p>同一筆 6 組資料（每組 n=5）用三種方式估計組均值：<span style="color:#7f8c8d">灰色</span>=資料；<span style="color:#c0392b">紅</span>=各組獨立均值（no pooling）；<span style="color:#1a6b5a">綠</span>=整體均值（complete pooling）；<span style="color:#2166ac">藍</span>=混合模型 BLUP（partial pooling）。拖動滑桿改變<strong>群間 vs 群內變異比 τ²/σ²</strong>——當 τ²/σ² 大（組真的不同），BLUP 接近 no-pooling；當 τ²/σ² 小（組差異是雜訊），BLUP 強烈收縮到整體均值。</p></div>
+<div data-lang="en"><p>Same 6 groups (n=5 each) estimated three ways: <span style="color:#7f8c8d">gray</span>=data; <span style="color:#c0392b">red</span>=independent group means (no pooling); <span style="color:#1a6b5a">green</span>=grand mean (complete pooling); <span style="color:#2166ac">blue</span>=mixed-model BLUP (partial pooling). The slider controls <strong>between/within variance ratio τ²/σ²</strong>: when τ²/σ² is large (groups truly differ), BLUP nears no-pooling; when small (group differences are noise), BLUP shrinks hard toward the grand mean.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats">
+  <span class="sim-stat pass" id="statTau">—</span>
+  <span class="sim-stat pass" id="statShrink">—</span>
+  <span class="sim-stat fail" id="statMSE">—</span>
+</div>
+<div class="slider-group"><label><span data-zh="群間/群內變異比 τ²/σ²" data-en="τ²/σ² (between/within)">τ²/σ²</span> <span id="valRatio">1.00</span></label><input type="range" id="sliderRatio" min="1" max="400" value="100" step="1"></div>
+<div class="slider-group"><label><span data-zh="每組樣本數 n" data-en="n per group">n per group</span> <span id="valN">5</span></label><input type="range" id="sliderN" min="2" max="30" value="5" step="1"></div>
+<div class="chart-container"><canvas id="poolChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="X: 組別；Y: 估計均值。觀察藍點（BLUP）在綠線與紅點之間的位置。" data-en="X: group; Y: estimated mean. Watch blue (BLUP) shrink between green (grand) and red (group).">X: 組別；Y: 估計均值</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: limma + lme4 bridge ===== -->
+<section class="section">
+<div class="section-label" data-zh="生物資訊連結" data-en="BIOINFO BRIDGE">生物資訊連結</div>
+<h2 data-zh="二、什麼時候在 omics 用混合模型？" data-en="II. When to use mixed models in omics">二、生物資訊中的應用</h2>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="情境" data-en="Scenario">情境</th>
+<th data-zh="模型" data-en="Model">模型</th>
+<th data-zh="工具" data-en="Tool">工具</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">RNA-seq 技術複製（同一樣本多 lane）</td><td data-lang="zh"><code>(1|sample)</code></td><td data-lang="zh"><code>limma::duplicateCorrelation</code></td><td data-lang="en">RNA-seq tech replicates (sample × lane)</td><td data-lang="en"><code>(1|sample)</code></td><td data-lang="en"><code>limma::duplicateCorrelation</code></td></tr>
+<tr><td data-lang="zh">多批次 RNA-seq</td><td data-lang="zh"><code>~ treatment + (1|batch)</code></td><td data-lang="zh"><code>variancePartition::dream</code></td><td data-lang="en">Multi-batch RNA-seq</td><td data-lang="en"><code>~ treatment + (1|batch)</code></td><td data-lang="en"><code>variancePartition::dream</code></td></tr>
+<tr><td data-lang="zh">scRNA-seq 多 donor（細胞嵌套 donor）</td><td data-lang="zh"><code>(1|donor)</code></td><td data-lang="zh">pseudobulk + DESeq2; muscat; NEBULA</td><td data-lang="en">scRNA-seq multi-donor (cells nested in donor)</td><td data-lang="en"><code>(1|donor)</code></td><td data-lang="en">pseudobulk + DESeq2; muscat; NEBULA</td></tr>
+<tr><td data-lang="zh">縱貫資料（同 subject 多時間點）</td><td data-lang="zh"><code>(time|subject)</code></td><td data-lang="zh"><code>lme4</code>; <code>nlme</code></td><td data-lang="en">Longitudinal (subjects × time)</td><td data-lang="en"><code>(time|subject)</code></td><td data-lang="en"><code>lme4</code>; <code>nlme</code></td></tr>
+<tr><td data-lang="zh">GWAS 親緣矩陣</td><td data-lang="zh">linear mixed model + kinship K</td><td data-lang="zh">GEMMA; SAIGE</td><td data-lang="en">GWAS with kinship</td><td data-lang="en">LMM + kinship K</td><td data-lang="en">GEMMA; SAIGE</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：ANOVA、ANCOVA、lmer" data-en="Code: ANOVA, ANCOVA, lmer">實作：ANOVA、ANCOVA、lmer</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- ANOVA / ANCOVA / mixed model 全套</span>
+<span class="func">library</span>(car); <span class="func">library</span>(lme4); <span class="func">library</span>(lmerTest); <span class="func">library</span>(emmeans); <span class="func">library</span>(performance)
+
+<span class="comment"># 1) 單因子 ANOVA（與 lm 等價）</span>
+fit_a &lt;- <span class="func">aov</span>(y ~ group, data = df)
+<span class="func">summary</span>(fit_a)
+<span class="comment"># 不平衡 → Type III SS</span>
+car::<span class="func">Anova</span>(<span class="func">lm</span>(y ~ group * sex, data = df), type = <span class="str">"III"</span>)
+
+<span class="comment"># 2) ANCOVA：加共變數，先檢查交互</span>
+<span class="func">anova</span>(<span class="func">lm</span>(y ~ group * cov, data=df), <span class="func">lm</span>(y ~ group + cov, data=df))
+fit_c &lt;- <span class="func">lm</span>(y ~ group + cov, data = df)        <span class="comment"># 平行斜率成立 → 用此</span>
+
+<span class="comment"># 3) Mixed model：固定 treatment、隨機 batch + subject</span>
+m &lt;- lme4::<span class="func">lmer</span>(y ~ treatment + (<span class="num">1</span>|batch) + (<span class="num">1</span>|subject),
+                 data = df, REML = <span class="kw">TRUE</span>)
+<span class="func">summary</span>(m)                                      <span class="comment"># lmerTest 提供 Satterthwaite df 與 p</span>
+<span class="func">anova</span>(m_null, m)                                <span class="comment"># LR 檢定 (改 REML=FALSE)</span>
+
+<span class="comment"># 4) 估計邊際均值 (EMM) + Tukey 比較</span>
+emmeans::<span class="func">emmeans</span>(m, pairwise ~ treatment, adjust = <span class="str">"tukey"</span>)
+
+<span class="comment"># 5) 模型診斷</span>
+performance::<span class="func">check_model</span>(m)                  <span class="comment"># 6 張全面診斷圖</span></pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> statsmodels.formula.api <span class="kw">as</span> smf
+<span class="kw">from</span> statsmodels.stats.anova <span class="kw">import</span> anova_lm
+<span class="kw">from</span> statsmodels.regression.mixed_linear_model <span class="kw">import</span> MixedLM
+<span class="kw">import</span> pingouin <span class="kw">as</span> pg
+
+<span class="comment"># 1) Type III ANOVA</span>
+fit = smf.<span class="func">ols</span>(<span class="str">"y ~ C(group) * C(sex)"</span>, data=df).<span class="func">fit</span>()
+<span class="func">anova_lm</span>(fit, typ=<span class="num">3</span>)
+
+<span class="comment"># 2) ANCOVA</span>
+fit_c = smf.<span class="func">ols</span>(<span class="str">"y ~ C(group) + cov"</span>, data=df).<span class="func">fit</span>()
+
+<span class="comment"># 3) Mixed model — random intercept on batch</span>
+m = MixedLM.<span class="func">from_formula</span>(<span class="str">"y ~ treatment"</span>, groups=<span class="str">"batch"</span>,
+                          re_formula=<span class="str">"~time"</span>, data=df).<span class="func">fit</span>(reml=<span class="kw">True</span>)
+<span class="func">print</span>(m.<span class="func">summary</span>())
+
+<span class="comment"># 4) 重複測量 ANOVA</span>
+pg.<span class="func">mixed_anova</span>(data=df, dv=<span class="str">"y"</span>, within=<span class="str">"time"</span>,
+               between=<span class="str">"group"</span>, subject=<span class="str">"id"</span>)
+
+<span class="comment"># 5) 跨平台：pymer4 把 lme4 帶到 Python</span>
+<span class="comment"># from pymer4.models import Lmer</span>
+<span class="comment"># Lmer(&quot;y ~ treatment + (1|batch)&quot;, data=df).fit()</span></pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>① <em>把批次當固定效應</em>——浪費 k−1 自由度，且結論無法推廣到「新 batch」。② <em>忽略嵌套結構</em>（同 subject 的多次測量當獨立樣本）——pseudoreplication，p 值嚴重偏小，是 omics 假陽性的隱形殺手。③ 模型寫 <code>(time|subject)</code> 但只有 2 個時間點——隨機斜率無法識別。</span>
+<span data-lang="en"><strong>Common mistakes:</strong> ① <em>Treating batch as fixed</em> — wastes k−1 df, and conclusions don't generalize to new batches. ② <em>Ignoring nesting</em> (multiple measurements per subject as independent) — pseudoreplication; p-values vastly anti-conservative; a silent killer of omics studies. ③ Writing <code>(time|subject)</code> with only 2 time points — random slope not identifiable.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 6: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. 你的研究有 8 個 RNA-seq batch，希望結論推廣到「未來再做的 batch」。batch 應怎麼建模？</p>
+<p data-lang="en">1. Your study has 8 RNA-seq batches and you want conclusions to generalize to future batches. How should batch enter the model?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 完全忽略</span><span data-lang="en">A. Ignore it</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 固定效應</span><span data-lang="en">B. Fixed effect</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 隨機效應 <code>(1|batch)</code></span><span data-lang="en">C. Random effect <code>(1|batch)</code></span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 共變數（連續數）</span><span data-lang="en">D. A continuous covariate</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 部分匯聚（partial pooling）解決了什麼問題？</p>
+<p data-lang="en">2. What problem does partial pooling solve?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 異質變異</span><span data-lang="en">A. Heteroscedasticity</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 多重共線性</span><span data-lang="en">B. Multicollinearity</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 在「每組獨立估計」（雜訊大）與「全體共用一個均值」（偏誤大）之間取得最佳偏誤-變異折衷</span><span data-lang="en">C. The bias-variance trade-off between fully separate (high variance) and fully pooled (high bias) estimation</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 缺失資料</span><span data-lang="en">D. Missing data</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">3. 為什麼 <code>lme4::lmer</code> 預設不給 p-value？</p>
+<p data-lang="en">3. Why does <code>lme4::lmer</code> by default refuse to print p-values?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 它沒有計算 t 統計量</span><span data-lang="en">A. It doesn't compute t-statistics</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 在不平衡設計下沒有閉式分母自由度——需 Satterthwaite (<code>lmerTest</code>) 或 Kenward-Roger 近似</span><span data-lang="en">B. There is no closed-form denominator df in unbalanced designs — needs Satterthwaite (<code>lmerTest</code>) or Kenward-Roger</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 因為 Bates 不相信 p-value</span><span data-lang="en">C. Because Bates dislikes p-values</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 混合模型沒有似然</span><span data-lang="en">D. Mixed models have no likelihood</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="linear-regression.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 6: Linear Regression</span></a>
+<a href="logistic-regression.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 8: Logistic Regression</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Box-Muller
+function randn(){let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+// Generate fixed groups: 6 groups, true means around grand mean = 5
+const K=6;
+const trueMeans=[3.0,4.2,4.7,5.3,5.9,7.1]; // fixed for reproducibility
+let baseGroups=[];
+// Seed-like: precomputed normals per (group, replicate up to 30)
+const precomp=[];for(let g=0;g<K;g++){const row=[];for(let r=0;r<30;r++)row.push(randn());precomp.push(row);}
+
+function buildData(nPer,sigma){
+  const groups=[];
+  for(let g=0;g<K;g++){const arr=[];for(let r=0;r<nPer;r++)arr.push(trueMeans[g]+sigma*precomp[g][r]);groups.push(arr);}
+  return groups;
+}
+function mean(a){let s=0;for(const v of a)s+=v;return s/a.length;}
+
+const poolChart=new Chart(document.getElementById('poolChart'),{
+  type:'scatter',
+  data:{datasets:[
+    {label:'data',data:[],backgroundColor:'rgba(120,120,120,0.45)',pointRadius:3},
+    {label:'no pooling (group mean)',data:[],backgroundColor:'rgba(192,57,43,0.95)',pointRadius:8,pointStyle:'rectRot'},
+    {label:'complete pooling (grand)',type:'line',data:[],borderColor:'rgba(26,107,90,0.9)',borderWidth:2.5,borderDash:[6,4],pointRadius:0,fill:false},
+    {label:'partial pooling (BLUP)',data:[],backgroundColor:'rgba(33,102,172,0.95)',pointRadius:8,pointStyle:'triangle'}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{position:'top'}},
+    scales:{x:{title:{display:true,text:'group'},min:0.5,max:K+0.5,ticks:{stepSize:1}},
+            y:{title:{display:true,text:'estimated mean'},min:1.5,max:9}}}
+});
+
+function updatePool(){
+  const ratio=(+document.getElementById('sliderRatio').value)/100; // tau²/sigma²
+  const nPer=+document.getElementById('sliderN').value;
+  document.getElementById('valRatio').textContent=ratio.toFixed(2);
+  document.getElementById('valN').textContent=nPer;
+  const sigma=1; // within-group SD
+  const tau2=ratio*sigma*sigma;
+  const data=buildData(nPer,sigma);
+  // Empirical means
+  const groupMeans=data.map(mean);
+  const grand=mean(groupMeans);
+  // BLUP shrinkage: y_hat_g = lambda * group_mean + (1-lambda) * grand
+  // lambda = tau²/(tau² + sigma²/n)
+  const lambda=tau2/(tau2 + (sigma*sigma)/nPer);
+  const blup=groupMeans.map(m=>lambda*m + (1-lambda)*grand);
+
+  // Plot data
+  const dataPts=[];for(let g=0;g<K;g++)for(const v of data[g])dataPts.push({x:g+1+(Math.random()-0.5)*0.18,y:v});
+  poolChart.data.datasets[0].data=dataPts;
+  poolChart.data.datasets[1].data=groupMeans.map((m,g)=>({x:g+1,y:m}));
+  poolChart.data.datasets[2].data=[{x:0.5,y:grand},{x:K+0.5,y:grand}];
+  poolChart.data.datasets[3].data=blup.map((m,g)=>({x:g+1,y:m}));
+  poolChart.update('none');
+
+  // MSE vs true means
+  let mseNo=0,mseBlup=0;for(let g=0;g<K;g++){mseNo+=Math.pow(groupMeans[g]-trueMeans[g],2);mseBlup+=Math.pow(blup[g]-trueMeans[g],2);}
+  mseNo/=K;mseBlup/=K;
+
+  const L=I18n.get();
+  const tT=L==='zh'?'收縮量 λ ':'λ (shrink) ';
+  const tR=L==='zh'?'τ²/σ² ':'τ²/σ² ';
+  const tM=L==='zh'?'BLUP MSE vs No-pool ':'BLUP MSE vs No-pool ';
+  document.getElementById('statTau').textContent=tR+ratio.toFixed(2);
+  document.getElementById('statShrink').textContent=tT+lambda.toFixed(2);
+  const mseEl=document.getElementById('statMSE');
+  mseEl.textContent=tM+mseBlup.toFixed(2)+' / '+mseNo.toFixed(2);
+  mseEl.classList.toggle('pass',mseBlup<=mseNo);
+  mseEl.classList.toggle('fail',mseBlup>mseNo);
+}
+['sliderRatio','sliderN'].forEach(id=>document.getElementById(id).addEventListener('input',updatePool));
+document.addEventListener('langchange',updatePool);
+updatePool();
+
+const QF={
+  zh:{
+    q1_y:'8 個 batch 是更大母體的可交換樣本 → 隨機效應。固定效應做不到對「未來 batch」的推廣。',q1_n:'正確答案已標示。隨機效應允許推廣到新 levels。',
+    q2_y:'部分匯聚是混合模型的核心優勢——以資料驅動方式介於分離與全體均值之間，最小化整體 MSE。',q2_n:'正確答案已標示。',
+    q3_y:'這是 Doug Bates 的著名立場：在不平衡資料下分母 df 無閉式解。Satterthwaite / Kenward-Roger 用近似來給 p-value。',q3_n:'正確答案已標示。'
+  },
+  en:{
+    q1_y:'8 batches are exchangeable from a larger population → random effect; only random effects let you generalize to future batches.',q1_n:'Correct answer highlighted.',
+    q2_y:'Partial pooling is the core advantage of mixed models — data-driven shrinkage minimizes overall MSE.',q2_n:'Correct answer highlighted.',
+    q3_y:'Famously Doug Bates: no closed-form denominator df in unbalanced designs. Satterthwaite / Kenward-Roger approximate it.',q3_n:'Correct answer highlighted.'
+  }
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.innerHTML=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

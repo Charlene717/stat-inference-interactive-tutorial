@@ -1,0 +1,281 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 1: Probability & Distributions — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html" class="active">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 1 / 17</div>
+<h1 data-zh="機率與分布 (Probability & Distributions)" data-en="Probability & Distributions">機率與分布</h1>
+<p class="subtitle" data-lang="zh">從隨機變數與機率分布出發，理解 RNA-seq 計數、t/F 檢定、貝氏推論共同的數學基石。</p>
+<p class="subtitle" data-lang="en">Random variables and distributions — the shared mathematical foundation for RNA-seq counts, t/F tests, and Bayesian inference.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Why ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼要先從機率分布開始？" data-en="Why start with probability distributions?">為什麼要先從機率分布開始？</h2>
+<div data-lang="zh">
+<p>所有統計推論——無論是 t 檢定、線性迴歸還是 limma 的 moderated t——都建立在「資料來自某個機率分布」的假設上。<strong>選錯分布</strong>是 RNA-seq 分析最常見的根本性錯誤：把 NB 計數當成常態，t 檢定的 p-value 就會嚴重失真；把 Poisson 套在過度離散的計數上，整批假陽性就會湧入。</p>
+<p>這一章我們先建立四個核心概念：(1) 隨機變數 (Random Variable, RV) 與機率空間，(2) 常見離散與連續分布，(3) 期望值、變異數與動差，(4) 大數法則 (LLN) 與中央極限定理 (CLT)——後者是「為何均值的抽樣分布漸近常態」的關鍵。</p>
+</div>
+<div data-lang="en">
+<p>Every statistical inference — t-test, linear regression, limma's moderated t — rests on a distributional assumption for the data. <strong>Choosing the wrong distribution</strong> is the single most common foundational mistake in RNA-seq analysis: treat NB counts as Gaussian and your t-test p-values are wildly off; fit Poisson to overdispersed counts and a flood of false positives follows.</p>
+<p>This chapter establishes four pillars: (1) random variables and probability spaces, (2) common discrete and continuous distributions, (3) expectation, variance, and moments, (4) the Law of Large Numbers (LLN) and Central Limit Theorem (CLT) — the latter explains why sample-mean sampling distributions become approximately normal even when the raw data are not.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>「資料是否常態」與「檢定是否需要常態」是兩件事。多數檢定 (如 t 檢定) 要求的是<em>統計量的抽樣分布</em>近似常態，而 CLT 在 n 夠大時會自動保證；真正不能跨過的是分布的<strong>家族</strong>選擇（NB vs Poisson vs Gaussian）。</span>
+<span data-lang="en"><strong>Core principle:</strong> "Is the data normal?" and "Does this test require normality?" are different questions. Most tests (e.g. t-test) need the <em>sampling distribution of the statistic</em> to be approximately normal — the CLT delivers that for large n. What you cannot fudge is the <strong>family</strong> choice (NB vs Poisson vs Gaussian).</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、隨機變數與機率分布家族" data-en="I. Random Variables and Distribution Families">一、隨機變數與機率分布家族</h2>
+<div data-lang="zh"><p><strong>隨機變數</strong>是把隨機試驗的結果映射到實數的函數——例如「在某基因上偵測到的 read 數」、「兩組樣本均值差」。每個 RV 都有自己的分布，描述其取值的機率行為。</p></div>
+<div data-lang="en"><p>A <strong>random variable</strong> maps the outcomes of a random experiment to real numbers — e.g. "reads detected at a given locus", "the difference of two sample means". Each RV has a distribution describing the probability of its values.</p></div>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">🔢</div><h4 data-zh="常見離散分布" data-en="Common Discrete Distributions">常見離散分布</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Bernoulli(p)</strong>：單次試驗成功/失敗——allele 是否突變。</li>
+<li><strong>Binomial(n, p)</strong>：n 次獨立 Bernoulli——測序中某 SNP 的支援 read 數。</li>
+<li><strong>Poisson(λ)</strong>：稀有事件計數——理想化的 RNA-seq counts，但通常<em>低估</em>變異。</li>
+<li><strong>Negative Binomial (NB)</strong>：Var = μ + αμ² ＞ Poisson 的 Var = μ；DESeq2 / edgeR 的核心。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Bernoulli(p)</strong>: a single success/failure — allele mutated or not.</li>
+<li><strong>Binomial(n, p)</strong>: n independent Bernoullis — supporting reads at a SNP.</li>
+<li><strong>Poisson(λ)</strong>: rare-event counts — idealized RNA-seq counts, usually <em>under-disperses</em> reality.</li>
+<li><strong>Negative Binomial</strong>: Var = μ + αμ² ＞ Poisson Var = μ; the core of DESeq2 / edgeR.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">〰️</div><h4 data-zh="常見連續分布" data-en="Common Continuous Distributions">常見連續分布</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Normal(μ, σ²)</strong>：CLT 的歸宿；眾多檢定的漸近基礎。</li>
+<li><strong>Student's t(ν)</strong>：小樣本下取代常態；limma 的 moderated t 即此分布的延伸。</li>
+<li><strong>χ²(ν), F(ν₁, ν₂)</strong>：方差比、卡方檢定、ANOVA 的工作分布。</li>
+<li><strong>Beta(α, β), Gamma(α, β)</strong>：Beta 是二項機率的共軛先驗；Gamma 是 Poisson 速率的共軛先驗。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Normal(μ, σ²)</strong>: the asymptotic destination via CLT; underlies most large-sample tests.</li>
+<li><strong>Student's t(ν)</strong>: replaces Normal at small n; limma's moderated t extends this.</li>
+<li><strong>χ²(ν), F(ν₁, ν₂)</strong>: variance ratios, chi-square tests, ANOVA.</li>
+<li><strong>Beta(α, β), Gamma(α, β)</strong>: Beta is conjugate to Binomial; Gamma to Poisson.</li>
+</ul></div>
+</div>
+</div>
+</section>
+
+<!-- ===== Section 3: Interactive — Poisson vs NB ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="Poisson vs Negative Binomial：過度離散模擬器" data-en="Poisson vs Negative Binomial: Overdispersion Simulator">Poisson vs NB 過度離散模擬器</h2>
+<div data-lang="zh"><p>RNA-seq 計數的 <code>Var/Mean</code> 通常顯著大於 1。拖動下方滑桿觀察：當 dispersion α 增加時，<span style="color:#c0392b">NB</span> 的右尾如何拉長，而 <span style="color:#1a6b5a">Poisson</span> 保持窄峰——這就是為什麼把 Poisson 套上 RNA-seq 會嚴重低估標準誤、產生大量假陽性。</p></div>
+<div data-lang="en"><p>RNA-seq counts almost always show <code>Var/Mean &gt; 1</code>. Drag the sliders below: as dispersion α grows, the <span style="color:#c0392b">NB</span> right tail stretches while <span style="color:#1a6b5a">Poisson</span> stays narrow — this is why fitting Poisson to RNA-seq counts hugely underestimates SE and floods you with false positives.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats"><span class="sim-stat pass" id="statMean">—</span><span class="sim-stat pass" id="statVarP">—</span><span class="sim-stat fail" id="statVarNB">—</span></div>
+<div class="slider-group"><label><span data-zh="平均 μ" data-en="Mean μ">平均 μ</span> <span id="valMu">10</span></label><input type="range" id="sliderMu" min="1" max="50" value="10" step="1"></div>
+<div class="slider-group"><label><span data-zh="NB 過度離散 α (Var = μ + αμ²)" data-en="NB dispersion α (Var = μ + αμ²)">NB dispersion α</span> <span id="valAlpha">0.30</span></label><input type="range" id="sliderAlpha" min="0" max="100" value="30" step="2"></div>
+<div class="chart-container"><canvas id="distChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;">X: count k | Y: P(X=k) | <span data-zh="實線：NB；點線：Poisson" data-en="Solid: NB; dotted: Poisson">實線：NB；點線：Poisson</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Expectations & CLT ===== -->
+<section class="section">
+<div class="section-label" data-zh="動差與極限定理" data-en="MOMENTS & LIMITS">動差與極限定理</div>
+<h2 data-zh="二、期望、變異數與中央極限定理" data-en="II. Expectations, Variance, and the CLT">二、期望、變異數與中央極限定理</h2>
+
+<div data-lang="zh">
+<p><strong>期望值</strong> E[X]、<strong>變異數</strong> Var[X] = E[(X−μ)²] 是描述分布最常用的兩個摘要。對 NB 而言 Var = μ + αμ² &gt; μ，這個「方差大於均值」就是 overdispersion 的數學定義。</p>
+<p><strong>大數法則 (LLN)：</strong>樣本平均 X̄ 隨著 n → ∞ 機率收斂於真實平均 μ。<strong>中央極限定理 (CLT)：</strong>當 X₁,...,Xₙ 為獨立同分布且變異數有限時，<code>(X̄ − μ)·√n / σ → N(0, 1)</code>。<em>注意 CLT 並未要求 X 本身常態</em>。這就是為什麼即使 RNA-seq 計數不是常態，<em>樣本平均</em>在 n 夠大時仍能用常態近似。</p>
+</div>
+<div data-lang="en">
+<p><strong>Expectation</strong> E[X] and <strong>variance</strong> Var[X] = E[(X−μ)²] are the two most-used distribution summaries. For NB, Var = μ + αμ² &gt; μ — this "variance exceeds mean" is the mathematical definition of overdispersion.</p>
+<p><strong>LLN:</strong> X̄ → μ in probability as n → ∞. <strong>CLT:</strong> for iid X₁,...,Xₙ with finite variance, <code>(X̄ − μ)·√n / σ → N(0, 1)</code>. <em>CLT does NOT require X itself to be normal.</em> That is precisely why even non-normal RNA-seq counts admit a Gaussian approximation for their sample mean once n is large.</p>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>CLT 的隱性條件：</strong>① 獨立性 — 細胞間相關、批次效應、配對樣本都會破壞獨立。② 有限變異數 — 重尾分布 (Cauchy、low-count single-cell dropout) 收斂極慢甚至無法收斂。③ n 多大才夠？看分布偏度——對 NB α ≈ 0.3，n ≈ 30 通常夠用；對極度偏態，n &gt; 100 也未必。</div>
+<div data-lang="en"><strong>CLT's hidden conditions:</strong> ① Independence — inter-cell correlation, batch effects, paired samples break it. ② Finite variance — heavy-tailed distributions (Cauchy, single-cell dropout) converge slowly or not at all. ③ "How large is large enough?" depends on skewness: for NB with α ≈ 0.3, n ≈ 30 usually suffices; for extreme skew even n &gt; 100 may not.</div>
+</div></div>
+</section>
+
+<!-- ===== Section 5: Decision Tree ===== -->
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="三、給生物資料選擇分布的決策樹" data-en="III. Choosing a Distribution for Biological Data">三、選擇分布的決策樹</h2>
+
+<div class="decision-tree">
+<h4>🌳 <span data-zh="分布選擇流程" data-en="Distribution Selection Flow">分布選擇流程</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>資料是<strong>計數</strong> (非負整數) 嗎？<span class="dt-arrow">→ 是 →</span> 走 Q2；否 → Q4。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>計算 Pearson dispersion <code>χ²/df</code>。≈ 1 → <strong>Poisson</strong> 即可；明顯 &gt; 1（RNA-seq 通常如此） → <strong>NB</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>零比例異常高（單細胞、生態學）？<span class="dt-arrow">→ 是 →</span> <strong>Zero-Inflated NB</strong> 或 hurdle 模型。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>資料連續且<strong>近似對稱、無極端值</strong>？<span class="dt-arrow">→ 是 →</span> <strong>Normal</strong>；右偏（基因表達、藥物濃度）→ <strong>log-Normal</strong> 或 Gamma。</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>變數是<strong>比例 / 機率</strong> (0–1)？<span class="dt-arrow">→ 是 →</span> <strong>Beta</strong>；事件率？→ <strong>Gamma</strong> 或 exponential。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Is the data <strong>counts</strong> (non-negative integers)? <span class="dt-arrow">→ Yes →</span> Q2; otherwise → Q4.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Compute Pearson dispersion <code>χ²/df</code>. ≈ 1 → <strong>Poisson</strong>; clearly &gt; 1 (typical of RNA-seq) → <strong>NB</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Excess zeros (single-cell, ecology)? <span class="dt-arrow">→ Yes →</span> <strong>Zero-Inflated NB</strong> or hurdle model.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Continuous, roughly symmetric, no extreme outliers? <span class="dt-arrow">→ Yes →</span> <strong>Normal</strong>; right-skew (gene expression, drug concentrations) → <strong>log-Normal</strong> or <strong>Gamma</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>Proportion / probability (0–1)? <span class="dt-arrow">→ Yes →</span> <strong>Beta</strong>; event rate? → <strong>Gamma</strong> or <strong>Exponential</strong>.</div></div>
+</div>
+</div>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="情境" data-en="Scenario">情境</th>
+<th data-zh="推薦分布" data-en="Recommended">分布</th>
+<th data-zh="關鍵診斷" data-en="Key Diagnostic">診斷</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">Bulk RNA-seq 計數</td><td data-lang="zh">NB</td><td data-lang="zh">χ²/df &gt; 1</td><td data-lang="en">Bulk RNA-seq counts</td><td data-lang="en">NB</td><td data-lang="en">χ²/df &gt; 1</td></tr>
+<tr><td data-lang="zh">scRNA-seq 計數（高零比例）</td><td data-lang="zh">ZINB / NB</td><td data-lang="zh">% zeros vs NB 預測</td><td data-lang="en">scRNA-seq counts (high zeros)</td><td data-lang="en">ZINB / NB</td><td data-lang="en">% zeros vs NB-expected</td></tr>
+<tr><td data-lang="zh">蛋白質定量 (log intensity)</td><td data-lang="zh">Normal</td><td data-lang="zh">QQ plot</td><td data-lang="en">Protein intensities (log)</td><td data-lang="en">Normal</td><td data-lang="en">QQ plot</td></tr>
+<tr><td data-lang="zh">細胞反應比例</td><td data-lang="zh">Beta / Binomial</td><td data-lang="zh">值域 [0, 1]</td><td data-lang="en">Cell response proportions</td><td data-lang="en">Beta / Binomial</td><td data-lang="en">support [0, 1]</td></tr>
+<tr><td data-lang="zh">病人存活時間</td><td data-lang="zh">Weibull / Exponential</td><td data-lang="zh">hazard 是否常數</td><td data-lang="en">Patient survival times</td><td data-lang="en">Weibull / Exponential</td><td data-lang="en">constant hazard?</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 6: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：分布擬合與 QQ plot" data-en="Code: Distribution Fitting & QQ Plot">實作：分布擬合與 QQ plot</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- 從 PMF / PDF 到分布擬合</span>
+<span class="comment"># 1) 內建分布函數族：d/p/q/r 前綴</span>
+<span class="func">dnorm</span>(<span class="num">0</span>); <span class="func">pnorm</span>(<span class="num">1.96</span>); <span class="func">qnorm</span>(<span class="num">0.975</span>); <span class="func">rnorm</span>(<span class="num">10</span>, mean=<span class="num">0</span>, sd=<span class="num">1</span>)
+<span class="func">dnbinom</span>(<span class="num">0</span>:<span class="num">20</span>, mu=<span class="num">5</span>, size=<span class="num">2</span>)  <span class="comment"># DESeq2 風格：mu, size=1/alpha</span>
+
+<span class="comment"># 2) 對實際資料擬合 NB</span>
+<span class="func">library</span>(MASS)
+fit &lt;- <span class="func">fitdistr</span>(counts, <span class="str">"negative binomial"</span>)
+fit$estimate                            <span class="comment"># mu 與 size</span>
+
+<span class="comment"># 3) QQ plot 與 Kolmogorov-Smirnov 檢定</span>
+<span class="func">qqnorm</span>(residuals); <span class="func">qqline</span>(residuals)
+<span class="func">ks.test</span>(counts, <span class="str">"pnbinom"</span>, mu=fit$estimate[<span class="str">"mu"</span>], size=fit$estimate[<span class="str">"size"</span>])
+
+<span class="comment"># 4) 視覺化過度離散：Var/Mean 比</span>
+<span class="func">var</span>(counts) / <span class="func">mean</span>(counts)         <span class="comment"># &gt; 1 → 過度離散</span></pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np, scipy.stats <span class="kw">as</span> st
+<span class="kw">import</span> statsmodels.api <span class="kw">as</span> sm
+
+<span class="comment"># 1) scipy.stats 各分布</span>
+st.norm.pdf(<span class="num">0</span>); st.norm.ppf(<span class="num">0.975</span>); st.norm.rvs(size=<span class="num">10</span>)
+st.nbinom.pmf(np.arange(<span class="num">21</span>), n=<span class="num">2</span>, p=<span class="num">2</span>/(<span class="num">2</span>+<span class="num">5</span>))  <span class="comment"># n=size, p=size/(size+mu)</span>
+
+<span class="comment"># 2) NB MLE via statsmodels</span>
+nb = sm.GLM(y, X, family=sm.families.NegativeBinomial(alpha=<span class="num">0.3</span>)).fit()
+nb.summary()
+
+<span class="comment"># 3) QQ plot</span>
+sm.qqplot(residuals, line=<span class="str">"45"</span>)
+
+<span class="comment"># 4) Overdispersion 診斷</span>
+np.var(counts) / np.mean(counts)         <span class="comment"># &gt; 1 → overdispersed</span>
+st.kstest(counts, lambda x: st.nbinom.cdf(x, n=<span class="num">2</span>, p=<span class="num">2</span>/<span class="num">7</span>))</pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>在 RNA-seq 計數上直接 <code>log(x+1)</code> 後跑 t 檢定，等同假設「轉換後常態」。對 low-count 基因，這個近似極差——這是 DESeq2 / edgeR 一定要用 NB GLM 而非 t 檢定的原因。</span>
+<span data-lang="en"><strong>Common mistake:</strong> running a t-test on <code>log(x+1)</code>-transformed RNA-seq counts assumes post-transformation normality. For low-count genes this approximation is awful — exactly why DESeq2/edgeR insist on NB GLM rather than t-test.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 7: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">1. RNA-seq 計數通常違反 Poisson 假設的主要原因是？</p>
+<p data-lang="en">1. Why do RNA-seq counts typically violate Poisson assumptions?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 計數不是整數</span><span data-lang="en">A. Counts are not integers</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 樣本數太多</span><span data-lang="en">B. Too many samples</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 生物變異使 Var &gt; Mean（過度離散）</span><span data-lang="en">C. Biological variation makes Var &gt; Mean (overdispersion)</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Poisson 的期望值無限大</span><span data-lang="en">D. Poisson has infinite expectation</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">2. 關於 CLT 的敘述何者正確？</p>
+<p data-lang="en">2. Which statement about the CLT is correct?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. CLT 要求 X 本身必須常態</span><span data-lang="en">A. CLT requires X itself to be normal</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. CLT 保證在 iid 與有限變異數下，樣本均值的抽樣分布漸近常態</span><span data-lang="en">B. Under iid &amp; finite variance, the sample mean's sampling distribution becomes asymptotically normal</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. CLT 對相關樣本仍然成立</span><span data-lang="en">C. CLT holds even for correlated samples</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. CLT 對 Cauchy 分布也成立</span><span data-lang="en">D. CLT holds for the Cauchy distribution</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">3. 哪個分布是 Binomial 機率參數 p 的共軛先驗？</p>
+<p data-lang="en">3. Which distribution is the conjugate prior for the Binomial probability parameter p?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. Normal</span><span data-lang="en">A. Normal</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. Gamma</span><span data-lang="en">B. Gamma</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. Beta</span><span data-lang="en">C. Beta</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Poisson</span><span data-lang="en">D. Poisson</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav"><div class="placeholder"></div>
+<a href="point-estimation.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 2: Point Estimation</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// log-gamma for combinatorics
+function lgamma(x){let g=0;while(x<7){g-=Math.log(x);x++}let z=1/(x*x);return g+(x-0.5)*Math.log(x)-x+0.5*Math.log(2*Math.PI)+(1/12-z/(360-z*z/1.5))/x;}
+function logChoose(n,k){return lgamma(n+1)-lgamma(k+1)-lgamma(n-k+1);}
+function poissonPMF(k,mu){return Math.exp(k*Math.log(mu)-mu-lgamma(k+1));}
+function nbPMF(k,mu,size){const p=size/(size+mu);return Math.exp(lgamma(k+size)-lgamma(k+1)-lgamma(size)+size*Math.log(p)+k*Math.log(1-p));}
+
+const distChart=new Chart(document.getElementById('distChart'),{type:'line',data:{labels:[],datasets:[
+  {label:'Poisson',data:[],borderColor:'rgba(26,107,90,0.85)',backgroundColor:'rgba(26,107,90,0.08)',borderDash:[5,4],tension:0.15,pointRadius:2,borderWidth:2},
+  {label:'Negative Binomial',data:[],borderColor:'rgba(192,57,43,0.9)',backgroundColor:'rgba(192,57,43,0.15)',tension:0.15,pointRadius:2,borderWidth:2.5,fill:true}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{title:{display:true,text:'k'}},y:{title:{display:true,text:'P(X = k)'},beginAtZero:true}}}});
+
+function updateDist(){
+  const mu=+document.getElementById('sliderMu').value;
+  const alpha=(+document.getElementById('sliderAlpha').value)/100;
+  document.getElementById('valMu').textContent=mu;
+  document.getElementById('valAlpha').textContent=alpha.toFixed(2);
+  const size=alpha<=0.001?1e6:1/alpha;
+  const kmax=Math.max(20,Math.round(mu+5*Math.sqrt(mu+alpha*mu*mu)));
+  const labels=[],pp=[],pn=[];
+  for(let k=0;k<=kmax;k++){labels.push(k);pp.push(poissonPMF(k,mu));pn.push(nbPMF(k,mu,size));}
+  distChart.data.labels=labels;distChart.data.datasets[0].data=pp;distChart.data.datasets[1].data=pn;
+  distChart.update('none');
+  const L=I18n.get();
+  const tMean=L==='zh'?'平均 ':'Mean ';
+  const tVarP=L==='zh'?'Poisson Var ':'Poisson Var ';
+  const tVarNB=L==='zh'?'NB Var ':'NB Var ';
+  document.getElementById('statMean').textContent=tMean+mu;
+  document.getElementById('statVarP').textContent=tVarP+mu.toFixed(2);
+  document.getElementById('statVarNB').textContent=tVarNB+(mu+alpha*mu*mu).toFixed(2);
+}
+['sliderMu','sliderAlpha'].forEach(id=>document.getElementById(id).addEventListener('input',updateDist));
+document.addEventListener('langchange',updateDist);
+updateDist();
+
+// Quiz
+const QF={
+  zh:{q1_y:'生物與技術變異使方差大於均值 (overdispersion)，這就是 NB 取代 Poisson 的根本原因。',q1_n:'正確答案已標示。',q2_y:'CLT 對任何有限變異數的 iid 樣本均值都有效，不需 X 本身常態。',q2_n:'正確答案已標示。',q3_y:'Beta 分布是 Binomial p 的共軛先驗——這也是 Bayesian A/B 測試的基礎。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'Biological + technical variation makes Var > Mean (overdispersion) — exactly why NB replaces Poisson.',q1_n:'Correct answer highlighted.',q2_y:'CLT applies to any iid mean with finite variance; X itself need not be normal.',q2_n:'Correct answer highlighted.',q3_y:'Beta is conjugate to Binomial — the foundation of Bayesian A/B testing.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

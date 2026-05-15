@@ -1,0 +1,354 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 6: Linear Regression & Diagnostics — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html" class="active">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 6 / 17</div>
+<h1 data-zh="線性迴歸與診斷 (Linear Regression &amp; Diagnostics)" data-en="Linear Regression &amp; Diagnostics">線性迴歸與診斷</h1>
+<p class="subtitle" data-lang="zh">OLS 是所有統計建模的母體——理解它的假設、診斷與穩健化，是進入 limma、GLM、混合模型的必要條件。</p>
+<p class="subtitle" data-lang="en">OLS is the parent of all statistical models — mastering its assumptions, diagnostics, and robust variants is the gateway to limma, GLMs, and mixed models.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Overview ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼線性迴歸仍是生物統計的脊椎？" data-en="Why is linear regression still the backbone of biostatistics?">為什麼線性迴歸仍是脊椎？</h2>
+<div data-lang="zh">
+<p>線性迴歸 <code>y = Xβ + ε</code> 是 t 檢定、ANOVA、ANCOVA 的統一框架；limma 的 <code>lmFit</code> 對每個基因擬合的就是一個線性模型。<strong>不是「過時的方法」，而是 GLM、mixed model、Bayesian regression 的基底——所有複雜模型都是它的推廣。</strong></p>
+<p>OLS 之所以強大，是因為在 Gauss-Markov 條件下（線性、外生性、同質變異、無多重共線性），最小平方估計量是 <strong>BLUE</strong>（Best Linear Unbiased Estimator）——在所有線性無偏估計中變異最小。但當假設破壞時，估計仍可能無偏，<em>標準誤卻會錯</em>——這正是為什麼<strong>診斷</strong>比點估計重要。</p>
+</div>
+<div data-lang="en">
+<p>Linear regression <code>y = Xβ + ε</code> is the unifying frame for t-test, ANOVA, and ANCOVA; limma's <code>lmFit</code> fits exactly such a model per gene. <strong>It is not an obsolete method but the substrate on which GLM, mixed, and Bayesian regression are built.</strong></p>
+<p>OLS is powerful because under the Gauss-Markov conditions (linearity, exogeneity, homoscedasticity, no perfect collinearity), least squares is <strong>BLUE</strong> — minimum variance among all linear unbiased estimators. When assumptions fail, point estimates often remain unbiased but <em>standard errors get wrong</em> — which is why <strong>diagnostics</strong> matter more than coefficients themselves.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>「檢查 y 是否常態」是常見誤解——OLS 不需要 y 常態，只在做<em>推論</em>（CI、p-value）時需要<strong>殘差</strong>近似常態，而且 CLT 在 n 夠大時會自動處理。真正必檢的是：殘差 vs 擬合的<strong>系統性樣式</strong>、<strong>同質變異</strong>、與<strong>影響點</strong>。</span>
+<span data-lang="en"><strong>Core principle:</strong> "Check if y is normal" is a textbook misconception. OLS does not require y to be normal — only the <strong>residuals</strong> should be approximately normal <em>for inference</em> (CIs, p-values), and CLT handles that when n is reasonable. The real diagnostics are: systematic patterns in residuals vs fitted, <strong>homoscedasticity</strong>, and <strong>influence</strong>.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、OLS、診斷與穩健化" data-en="I. OLS, Diagnostics, and Robustification">一、OLS、診斷與穩健化</h2>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">📐</div><h4 data-zh="OLS 估計與 Gauss-Markov" data-en="OLS Estimation &amp; Gauss-Markov">OLS 與 Gauss-Markov</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>正規方程式：<code>β̂ = (XᵀX)⁻¹ Xᵀy</code></li>
+<li>BLUE 條件：線性、獨立、同質變異、外生性</li>
+<li>常態誤差 → t / F 分布；無常態 → 仍可用 CLT 近似</li>
+<li>R² 是<em>樣本內</em>擬合度——不等於預測力</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Normal equations: <code>β̂ = (XᵀX)⁻¹ Xᵀy</code></li>
+<li>BLUE conditions: linearity, independence, homoscedasticity, exogeneity</li>
+<li>Normal errors → t / F distributions; non-normal → CLT-based approximation</li>
+<li>R² is <em>in-sample</em> fit — not predictive power</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">📊</div><h4 data-zh="四張殘差診斷圖" data-en="The Four plot.lm Panels">四張殘差診斷圖</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Residuals vs Fitted</strong>：曲線樣式 → 非線性</li>
+<li><strong>QQ plot</strong>：尾部偏離 → 非常態 / 重尾</li>
+<li><strong>Scale-Location</strong>：開口形 → 異質變異</li>
+<li><strong>Residuals vs Leverage</strong>：Cook's 距離 → 影響點</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Residuals vs Fitted</strong>: curvature → non-linearity</li>
+<li><strong>QQ plot</strong>: tail deviation → non-normal / heavy tails</li>
+<li><strong>Scale-Location</strong>: funnel shape → heteroscedasticity</li>
+<li><strong>Residuals vs Leverage</strong>: Cook's distance → influential points</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🔗</div><h4 data-zh="多重共線性與 VIF" data-en="Multicollinearity &amp; VIF">多重共線性與 VIF</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>VIF<sub>j</sub> = 1/(1−R²<sub>j</sub>)；VIF &gt; 5–10 警示</li>
+<li><strong>不偏</strong>係數，但<strong>膨脹</strong>標準誤 → t 變小、p 變大</li>
+<li>解法：刪除冗餘變數、合併、PCA 或 ridge 正則化</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>VIF<sub>j</sub> = 1/(1−R²<sub>j</sub>); VIF &gt; 5–10 is a red flag</li>
+<li>Does <strong>not</strong> bias coefficients, but <strong>inflates</strong> SE → smaller t, larger p</li>
+<li>Fix: drop redundancy, combine, PCA, or ridge regularization</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">⚖️</div><h4 data-zh="影響點：leverage + Cook" data-en="Influence: Leverage + Cook">影響點</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Leverage h<sub>ii</sub>：X 空間中的「邊角」位置</li>
+<li>Cook's D = (殘差²) × (h<sub>ii</sub>/(1-h<sub>ii</sub>)²)</li>
+<li>DFBETA：個別點對<em>單一</em>係數的影響</li>
+<li>規則：Cook &gt; 4/n 或 &gt; 1 警示</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li>Leverage h<sub>ii</sub>: corner position in X-space</li>
+<li>Cook's D combines residual size × h<sub>ii</sub>/(1-h<sub>ii</sub>)²</li>
+<li>DFBETA: point's influence on a <em>single</em> coefficient</li>
+<li>Rule of thumb: Cook &gt; 4/n or &gt; 1 flags</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>異質變異與穩健 SE：</strong>若 <code>bptest</code>（Breusch-Pagan）拒絕同質變異，<em>不要</em>盲目對數轉換 y——這會改變模型解釋。先試 <strong>HC3 (White / sandwich) 穩健標準誤</strong>：係數不變，但 SE / CI / p-value 都對異質變異穩健。若異質變異與結構有關（如 RNA-seq 計數的 mean-variance），就應走 <strong>GLM</strong>（NB、Gamma）而非 OLS+轉換。</div>
+<div data-lang="en"><strong>Heteroscedasticity &amp; robust SE:</strong> if Breusch-Pagan <code>bptest</code> rejects homoscedasticity, don't reflexively log-transform y — that changes the model. First try <strong>HC3 (White / sandwich) robust SE</strong>: coefficients unchanged, but SE / CI / p-values now valid under heteroscedasticity. If the variance structure is intrinsic (e.g. RNA-seq mean-variance), move to a <strong>GLM</strong> (NB, Gamma) rather than OLS-plus-transform.</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="影響點如何扭曲迴歸線" data-en="How One Point Can Swing the Fit">影響點如何扭曲迴歸線</h2>
+<div data-lang="zh"><p>下圖中有一個<span style="color:#c0392b"><strong>紅色可拖曳點</strong></span>——用滑鼠拖動它（或調滑桿改變其 x / y 位置），觀察迴歸線斜率、R²、與 Cook's 距離如何即時變化。當該點同時具有高 leverage（離 x̄ 遠）與大殘差時，Cook's D 飆升——這就是<strong>影響點</strong>的數學定義。</p></div>
+<div data-lang="en"><p>The plot below has a <span style="color:#c0392b"><strong>red draggable point</strong></span> — move it via the sliders (or click to set) and watch the regression line, R², and Cook's distance update live. When the point has both high leverage (far from x̄) AND large residual, Cook's D spikes — the mathematical definition of an <strong>influential point</strong>.</p></div>
+<div class="interactive-panel">
+<div class="sim-stats">
+  <span class="sim-stat pass" id="statSlope">—</span>
+  <span class="sim-stat pass" id="statR2">—</span>
+  <span class="sim-stat fail" id="statCook">—</span>
+</div>
+<div class="slider-group"><label><span data-zh="紅點 x 位置" data-en="Red point x">紅點 x</span> <span id="valPx">8.0</span></label><input type="range" id="sliderPx" min="-2" max="12" value="8" step="0.1"></div>
+<div class="slider-group"><label><span data-zh="紅點 y 位置" data-en="Red point y">紅點 y</span> <span id="valPy">10.0</span></label><input type="range" id="sliderPy" min="-5" max="25" value="10" step="0.1"></div>
+<div class="chart-container"><canvas id="lmChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;"><span data-zh="灰點：固定資料 (n=20)；紅點：可拖曳；藍線：含紅點的 OLS 擬合" data-en="Gray: fixed n=20 data; Red: draggable; Blue: OLS fit including red point">灰點：固定資料；紅點：可拖曳；藍線：含紅點的 OLS 擬合</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Decision Guide ===== -->
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="二、殘差診斷流程：當假設失敗怎麼辦？" data-en="II. Residual Diagnostics Workflow: When Assumptions Fail">二、殘差診斷流程</h2>
+
+<div class="decision-tree">
+<h4>🌳 <span data-zh="OLS 診斷與修正路徑" data-en="OLS Diagnostic &amp; Remediation Path">OLS 診斷與修正路徑</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>殘差 vs 擬合圖呈<strong>曲線</strong>樣式？<span class="dt-arrow">→ 是 →</span> 非線性。加入<strong>多項式 / 樣條 (spline) / GAM</strong>，或改 log 等轉換。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Scale-Location 呈<strong>開口/喇叭</strong>樣式？<span class="dt-arrow">→ 是 →</span> 異質變異。先 <strong>HC3 sandwich SE</strong>；若結構性 → <strong>GLS</strong> 加權或改 <strong>GLM</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>任一 <strong>VIF &gt; 5–10</strong>？<span class="dt-arrow">→ 是 →</span> 多重共線。刪除冗餘 / 合併指標 / PCA / <strong>ridge</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Cook's D &gt; 4/n（或 &gt; 1）？<span class="dt-arrow">→ 是 →</span> 影響點。<em>不要直接刪</em>——先檢查資料錯誤 / 異常生物學意義；若必須保留 → <strong>穩健迴歸 (rlm, MM-estimator)</strong>。</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>QQ plot 嚴重重尾？<span class="dt-arrow">→ 是 →</span> 多半是 Q1/Q2/Q4 的次生現象。修完前四項後重看；若仍重尾 → <strong>t-likelihood / quantile regression</strong>。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Residuals-vs-fitted shows <strong>curvature</strong>? <span class="dt-arrow">→ Yes →</span> non-linearity. Add <strong>polynomial / spline / GAM</strong>, or transform.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>Scale-Location shows a <strong>funnel</strong>? <span class="dt-arrow">→ Yes →</span> heteroscedasticity. First <strong>HC3 sandwich SE</strong>; if structural → <strong>WLS / GLS</strong> or switch to a <strong>GLM</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>Any <strong>VIF &gt; 5–10</strong>? <span class="dt-arrow">→ Yes →</span> multicollinearity. Drop / combine / PCA / <strong>ridge</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Cook's D &gt; 4/n (or &gt; 1)? <span class="dt-arrow">→ Yes →</span> influence. <em>Don't just delete</em> — check for data errors / biological meaning; if you must keep it → <strong>robust regression (rlm, MM-estimator)</strong>.</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>QQ plot heavy tails? <span class="dt-arrow">→ Yes →</span> usually downstream of Q1/Q2/Q4. Re-check after fixing those; if still heavy → <strong>t-likelihood / quantile regression</strong>.</div></div>
+</div>
+</div>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="假設違反" data-en="Violation">違反</th>
+<th data-zh="徵兆" data-en="Symptom">徵兆</th>
+<th data-zh="修正" data-en="Fix">修正</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">非線性</td><td data-lang="zh">曲線殘差</td><td data-lang="zh">spline / GAM</td><td data-lang="en">Non-linearity</td><td data-lang="en">curved residuals</td><td data-lang="en">spline / GAM</td></tr>
+<tr><td data-lang="zh">異質變異</td><td data-lang="zh">喇叭殘差</td><td data-lang="zh">HC3 / WLS / GLM</td><td data-lang="en">Heteroscedasticity</td><td data-lang="en">funnel residuals</td><td data-lang="en">HC3 / WLS / GLM</td></tr>
+<tr><td data-lang="zh">多重共線性</td><td data-lang="zh">VIF 高、SE 膨脹</td><td data-lang="zh">drop / ridge</td><td data-lang="en">Multicollinearity</td><td data-lang="en">high VIF, inflated SE</td><td data-lang="en">drop / ridge</td></tr>
+<tr><td data-lang="zh">影響點</td><td data-lang="zh">Cook 飆升</td><td data-lang="zh">rlm / 檢查資料</td><td data-lang="en">Influential point</td><td data-lang="en">Cook spike</td><td data-lang="en">rlm / inspect data</td></tr>
+<tr><td data-lang="zh">相關殘差</td><td data-lang="zh">Durbin-Watson、批次</td><td data-lang="zh">mixed model</td><td data-lang="en">Correlated errors</td><td data-lang="en">Durbin-Watson, batch</td><td data-lang="en">mixed model</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 5: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：擬合、診斷、穩健 SE" data-en="Code: Fit, Diagnose, Robust SE">實作：擬合、診斷、穩健 SE</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- OLS 全流程</span>
+<span class="func">library</span>(broom); <span class="func">library</span>(car); <span class="func">library</span>(lmtest); <span class="func">library</span>(sandwich)
+
+<span class="comment"># 1) 擬合與整理</span>
+fit &lt;- <span class="func">lm</span>(y ~ x1 + x2 + x3, data = df)
+<span class="func">summary</span>(fit)
+broom::<span class="func">tidy</span>(fit, conf.int = <span class="kw">TRUE</span>)        <span class="comment"># 整潔的係數表</span>
+broom::<span class="func">glance</span>(fit)                          <span class="comment"># R², AIC, p, df</span>
+
+<span class="comment"># 2) 四張診斷圖（plot.lm 一鍵呼叫）</span>
+<span class="func">par</span>(mfrow = <span class="func">c</span>(<span class="num">2</span>, <span class="num">2</span>)); <span class="func">plot</span>(fit)
+
+<span class="comment"># 3) 多重共線性</span>
+car::<span class="func">vif</span>(fit)                              <span class="comment"># &gt; 5–10 警示</span>
+
+<span class="comment"># 4) 影響點：Cook、DFBETA、leverage</span>
+car::<span class="func">influencePlot</span>(fit)                    <span class="comment"># 互動式氣泡圖</span>
+<span class="func">cooks.distance</span>(fit) |&gt; <span class="func">which</span>(. &gt; <span class="num">4</span>/<span class="func">nrow</span>(df))
+
+<span class="comment"># 5) 異質變異 → HC3 穩健 SE</span>
+lmtest::<span class="func">bptest</span>(fit)                          <span class="comment"># Breusch-Pagan</span>
+lmtest::<span class="func">coeftest</span>(fit, vcov = sandwich::<span class="func">vcovHC</span>(fit, type = <span class="str">"HC3"</span>))</pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> statsmodels.formula.api <span class="kw">as</span> smf
+<span class="kw">import</span> statsmodels.api <span class="kw">as</span> sm
+<span class="kw">from</span> statsmodels.stats.outliers_influence <span class="kw">import</span> variance_inflation_factor, OLSInfluence
+
+<span class="comment"># 1) 擬合</span>
+fit = smf.<span class="func">ols</span>(<span class="str">"y ~ x1 + x2 + x3"</span>, data = df).<span class="func">fit</span>()
+<span class="func">print</span>(fit.<span class="func">summary</span>())
+
+<span class="comment"># 2) 殘差診斷圖</span>
+<span class="kw">import</span> statsmodels.graphics.regressionplots <span class="kw">as</span> rp
+rp.<span class="func">plot_regress_exog</span>(fit, <span class="str">"x1"</span>)
+
+<span class="comment"># 3) VIF</span>
+X = fit.model.exog
+[<span class="func">variance_inflation_factor</span>(X, i) <span class="kw">for</span> i <span class="kw">in</span> <span class="func">range</span>(X.shape[<span class="num">1</span>])]
+
+<span class="comment"># 4) Cook、leverage</span>
+infl = fit.<span class="func">get_influence</span>()
+cooks_d, _ = infl.cooks_distance
+hii = infl.hat_matrix_diag
+
+<span class="comment"># 5) HC3 穩健 SE</span>
+robust = fit.<span class="func">get_robustcov_results</span>(cov_type=<span class="str">"HC3"</span>)
+<span class="func">print</span>(robust.<span class="func">summary</span>())</pre></div>
+</div>
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>① 用 <code>step()</code> 做變數選擇後，再用同一筆資料報告 p-value——係數與 p 都被嚴重偏估（post-selection inference）。<em>使用懲罰式方法（lasso、ridge）或事前指定模型</em>。② 在 genomics 中看到 R² &gt; 0.9——多半是<strong>樣本洩漏</strong>或批次混雜，不是「擬合很好」。</span>
+<span data-lang="en"><strong>Common mistakes:</strong> ① Using <code>step()</code> then reporting p-values on the same data — both coefficients and p-values are heavily biased (post-selection inference). <em>Use penalized methods (lasso, ridge) or pre-specified models</em>. ② Seeing R² &gt; 0.9 in genomics — usually <strong>sample leakage</strong> or batch confounding, not "great fit".</span>
+</div></div>
+</section>
+
+<!-- ===== Section 6: limma tie-in ===== -->
+<section class="section">
+<div class="section-label" data-zh="與 limma 的連結" data-en="CONNECTION TO limma">與 limma 的連結</div>
+<h2 data-zh="三、limma 就是百萬個線性模型" data-en="III. limma = a million linear models">三、limma = 百萬個線性模型</h2>
+<div data-lang="zh"><p>limma 對 <em>每個基因</em> 擬合 <code>lm(expression ~ design)</code>，再做 empirical Bayes 把所有基因的殘差變異 <em>shrunk</em> 到共同先驗——這就是 <strong>moderated t-statistic</strong>。所以本章的所有診斷（殘差、共線性、影響點）<strong>都直接適用</strong>於 limma，只不過從一張圖變成「每個基因都要關心」的尺度問題。實務上看 <code>limma::plotSA</code>（mean-variance）與 <code>plotMD</code>（每基因擬合）取代 <code>plot.lm</code>。</p></div>
+<div data-lang="en"><p>limma fits <code>lm(expression ~ design)</code> for <em>each gene</em>, then empirical-Bayes shrinks residual variances to a common prior — yielding the <strong>moderated t-statistic</strong>. Every diagnostic in this chapter (residuals, collinearity, influence) <strong>applies directly</strong> to limma — just at scale. Use <code>limma::plotSA</code> (mean-variance) and <code>plotMD</code> (per-gene fit) as the genome-wide counterparts of <code>plot.lm</code>.</p></div>
+</section>
+
+<!-- ===== Section 7: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. 異質變異違反了哪條 OLS 假設？以下哪個是最佳<em>第一線</em>修正？</p>
+<p data-lang="en">1. Which OLS assumption does heteroscedasticity violate, and what is the best <em>first-line</em> fix?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 違反獨立性；用 mixed model</span><span data-lang="en">A. Violates independence; use mixed model</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 違反同質變異 (Gauss-Markov)；用 HC3 sandwich 穩健 SE</span><span data-lang="en">B. Violates homoscedasticity; use HC3 sandwich robust SE</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 違反線性；用 polynomial</span><span data-lang="en">C. Violates linearity; use polynomial</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 違反常態；對 y 取 log</span><span data-lang="en">D. Violates normality; log y</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. 關於高 VIF（多重共線性），下列何者正確？</p>
+<p data-lang="en">2. About high VIF (multicollinearity), which is correct?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 會使係數估計變偏（biased）</span><span data-lang="en">A. It biases coefficient estimates</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 會使預測值變差</span><span data-lang="en">B. It worsens predictions</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 不偏係數，但膨脹 SE → t 變小、p 變大；對<em>純預測</em>無大影響</span><span data-lang="en">C. Doesn't bias coefficients, but inflates SE → smaller t, larger p; little effect on <em>pure prediction</em></span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 與 leverage 同義</span><span data-lang="en">D. Same as leverage</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="3">
+<p data-lang="zh">3. Cook's 距離大表示什麼？</p>
+<p data-lang="en">3. A large Cook's distance indicates what?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 殘差大但 leverage 小</span><span data-lang="en">A. Large residual but low leverage</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. Leverage 大但殘差小</span><span data-lang="en">B. High leverage but small residual</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. R² 很高</span><span data-lang="en">C. High R²</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 兼具大殘差<em>與</em>高 leverage，整體擬合對該點高度敏感</span><span data-lang="en">D. Both large residual <em>and</em> high leverage — the fit is highly sensitive to that point</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="common-tests.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 5: Common Tests</span></a>
+<a href="anova-mixed-models.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 7: ANOVA &amp; Mixed Models</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// Fixed n=20 dataset (deterministic, near y = 1.5 + 0.8*x)
+const baseX=[0.3,0.9,1.5,2.0,2.6,3.1,3.8,4.2,4.8,5.5,6.0,6.5,7.1,7.6,8.0,8.6,9.2,9.7,10.3,11.0];
+const baseY=[1.9,2.3,2.7,3.0,3.7,3.8,4.6,4.9,5.4,6.0,6.5,6.7,7.1,7.8,8.0,8.7,9.2,9.5,10.1,10.9];
+
+function fitOLS(xs,ys){
+  const n=xs.length;let sx=0,sy=0;for(let i=0;i<n;i++){sx+=xs[i];sy+=ys[i];}
+  const mx=sx/n,my=sy/n;let sxx=0,sxy=0,syy=0;
+  for(let i=0;i<n;i++){const dx=xs[i]-mx,dy=ys[i]-my;sxx+=dx*dx;sxy+=dx*dy;syy+=dy*dy;}
+  const b1=sxy/sxx,b0=my-b1*mx;
+  let ss_res=0;for(let i=0;i<n;i++){const r=ys[i]-(b0+b1*xs[i]);ss_res+=r*r;}
+  const r2=1-ss_res/syy;
+  return{b0,b1,mx,sxx,ss_res,r2,n};
+}
+
+// Cook's D for the last point (index n-1)
+function cookForLast(xs,ys){
+  const f=fitOLS(xs,ys);const n=f.n,k=2;
+  const sigma2=f.ss_res/(n-k);
+  const i=n-1;const dx=xs[i]-f.mx;
+  const hii=1/n + dx*dx/f.sxx;
+  const yhat=f.b0+f.b1*xs[i];
+  const r=ys[i]-yhat;
+  const D=(r*r/(k*sigma2)) * (hii/Math.pow(1-hii,2));
+  return{D,hii,fit:f};
+}
+
+const lmChart=new Chart(document.getElementById('lmChart'),{
+  type:'scatter',
+  data:{datasets:[
+    {label:'data',data:baseX.map((x,i)=>({x,y:baseY[i]})),backgroundColor:'rgba(120,120,120,0.55)',pointRadius:4},
+    {label:'red point',data:[{x:8,y:10}],backgroundColor:'rgba(192,57,43,0.95)',pointRadius:9,pointBorderColor:'#fff',pointBorderWidth:2},
+    {type:'line',label:'OLS fit',data:[],borderColor:'rgba(33,102,172,0.95)',borderWidth:2.5,pointRadius:0,fill:false,tension:0}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{position:'top'}},
+    scales:{x:{title:{display:true,text:'x'},min:-3,max:13},y:{title:{display:true,text:'y'},min:-6,max:26}}}
+});
+
+function updateLM(){
+  const px=+document.getElementById('sliderPx').value;
+  const py=+document.getElementById('sliderPy').value;
+  document.getElementById('valPx').textContent=px.toFixed(1);
+  document.getElementById('valPy').textContent=py.toFixed(1);
+  const xs=baseX.concat([px]),ys=baseY.concat([py]);
+  const {D,fit}=cookForLast(xs,ys);
+  const xmin=-3,xmax=13;
+  lmChart.data.datasets[1].data=[{x:px,y:py}];
+  lmChart.data.datasets[2].data=[{x:xmin,y:fit.b0+fit.b1*xmin},{x:xmax,y:fit.b0+fit.b1*xmax}];
+  lmChart.update('none');
+  const L=I18n.get();
+  const tSlope=L==='zh'?'斜率 ':'Slope ';
+  const tR2='R² ';
+  const tCook='Cook’s D ';
+  document.getElementById('statSlope').textContent=tSlope+fit.b1.toFixed(3);
+  document.getElementById('statR2').textContent=tR2+fit.r2.toFixed(3);
+  const cookEl=document.getElementById('statCook');
+  cookEl.textContent=tCook+D.toFixed(3);
+  cookEl.classList.toggle('pass',D<4/(baseX.length+1));
+  cookEl.classList.toggle('fail',D>=4/(baseX.length+1));
+}
+['sliderPx','sliderPy'].forEach(id=>document.getElementById(id).addEventListener('input',updateLM));
+document.addEventListener('langchange',updateLM);
+updateLM();
+
+// Quiz
+const QF={
+  zh:{
+    q1_y:'異質變異違反 Gauss-Markov 的同質變異。HC3 三明治 SE 保留係數、修正 SE，是最常用第一線。',q1_n:'正確答案已標示。HC3 是異質變異的標準修正。',
+    q2_y:'VIF 高不影響點估計，但放大 SE 使顯著性消失。對純預測影響小（因為仍 BLUE），對<em>解釋</em>係數則嚴重。',q2_n:'正確答案已標示。共線性放大 SE，不偏係數。',
+    q3_y:'Cook’s D = 殘差² × leverage 函數——同時大才會飆升，這是定義「影響」的核心。',q3_n:'正確答案已標示。Cook’s D 同時看殘差與 leverage。'
+  },
+  en:{
+    q1_y:'Heteroscedasticity violates Gauss-Markov homoscedasticity. HC3 sandwich SE keeps coefficients, corrects SE — the standard first-line fix.',q1_n:'Correct answer highlighted. HC3 is the standard fix.',
+    q2_y:'High VIF doesn’t bias estimates but inflates SE, killing significance. Pure prediction is mostly safe; coefficient <em>interpretation</em> is not.',q2_n:'Correct answer highlighted. Collinearity inflates SE but keeps coefficients unbiased.',
+    q3_y:'Cook’s D = residual² × leverage function — both must be large to spike. That’s the very definition of influence.',q3_n:'Correct answer highlighted. Cook’s D combines residual and leverage.'
+  }
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.innerHTML=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

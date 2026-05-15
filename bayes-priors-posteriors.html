@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Step 10: Bayes' Theorem, Priors, Posteriors — Statistical Inference Tutorial</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head><body>
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="probability-and-distributions.html">Prob.</a></li><li><a href="point-estimation.html">Est.</a></li><li><a href="confidence-intervals-bootstrap.html">CI</a></li><li><a href="hypothesis-testing.html">HT</a></li><li><a href="common-tests.html">Tests</a></li><li><a href="linear-regression.html">LM</a></li><li><a href="anova-mixed-models.html">ANOVA</a></li><li><a href="logistic-regression.html">Logit</a></li><li><a href="glm-count-models.html">GLM</a></li><li><a href="bayes-priors-posteriors.html" class="active">Bayes</a></li><li><a href="mcmc-diagnostics.html">MCMC</a></li><li><a href="posterior-summaries.html">Post.</a></li><li><a href="empirical-bayes-limma.html">EB</a></li><li><a href="multiple-testing-fdr.html">FDR</a></li><li><a href="de-statistics.html">DE</a></li><li><a href="permutation-gsea.html">Perm.</a></li><li><a href="survival-analysis.html">Surv.</a></li>
+  </ul>
+</div></nav>
+<div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+<header class="page-hero"><div class="step-badge">STEP 10 / 17</div>
+<h1 data-zh="貝氏定理、先驗、後驗 (Bayes' Theorem, Priors, Posteriors)" data-en="Bayes' Theorem, Priors, Posteriors">貝氏定理、先驗、後驗</h1>
+<p class="subtitle" data-lang="zh">從 p(θ|y) ∝ p(y|θ)·p(θ) 出發：建立先驗、看資料修正成後驗、把不確定性留在參數上而非 p-value 上。</p>
+<p class="subtitle" data-lang="en">Starting from p(θ|y) ∝ p(y|θ)·p(θ): place a prior, let data update it to a posterior, and carry uncertainty on parameters rather than on p-values.</p>
+</header>
+<main class="content-wrap">
+
+<!-- ===== Section 1: Why ===== -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="為什麼要做貝氏？" data-en="Why go Bayesian?">為什麼要做貝氏？</h2>
+<div data-lang="zh">
+<p>頻率學派把參數 θ 當固定未知量，談的是「重複實驗下估計量的長期表現」；貝氏學派把 θ 視為帶有分布的隨機量，用<strong>後驗分布</strong> <code>p(θ|y)</code> 直接陳述「給定資料，θ 在哪個範圍的機率多大」。這正是大多數實驗者真正想知道的——而頻率派的 CI / p-value 並不能這樣解讀。</p>
+<p>核心公式只有一個：<code>p(θ|y) = p(y|θ)·p(θ) / p(y)</code>，正比形式寫成 <code>posterior ∝ likelihood × prior</code>。三件事決定一切：(1) 先驗 <code>p(θ)</code> 編碼你對 θ 的事前知識；(2) 概似 <code>p(y|θ)</code> 是資料的機率模型；(3) 後驗自動把兩者組合成參數的不確定性，並可進一步生出預測分布。</p>
+</div>
+<div data-lang="en">
+<p>Frequentists treat θ as a fixed unknown and reason about long-run frequencies of estimators; Bayesians treat θ as a random quantity with a distribution, and use the <strong>posterior</strong> <code>p(θ|y)</code> to state directly "given the data, the probability θ falls in this range is …". That is what most experimenters actually want — and what a frequentist CI / p-value cannot deliver.</p>
+<p>The whole machinery is one equation: <code>p(θ|y) = p(y|θ)·p(θ) / p(y)</code>, or proportionally <code>posterior ∝ likelihood × prior</code>. Three pieces govern everything: (1) the prior <code>p(θ)</code> encodes prior knowledge about θ; (2) the likelihood <code>p(y|θ)</code> is the data model; (3) the posterior combines them automatically and propagates uncertainty into predictive distributions.</p>
+</div>
+<div class="callout tip"><span class="callout-icon">💡</span><div>
+<span data-lang="zh"><strong>核心原則：</strong>後驗是先驗與概似的「妥協」。<em>n 小時先驗主導</em>，<em>n 大時概似（資料）主導</em>。所以先驗選擇影響最大的時刻，永遠是樣本量極小的研究 — 也是生物醫學初探實驗的常態。</span>
+<span data-lang="en"><strong>Core principle:</strong> the posterior is a compromise between prior and likelihood. <em>Small n → prior dominates</em>; <em>large n → data dominate</em>. So prior choice matters most exactly in the small-sample regime — which is most early-stage biomedical experiments.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 2: Core Concepts ===== -->
+<section class="section">
+<div class="section-label" data-zh="核心概念" data-en="CORE CONCEPTS">核心概念</div>
+<h2 data-zh="一、貝氏推論的四個積木" data-en="I. The Four Building Blocks of Bayesian Inference">一、貝氏推論的四個積木</h2>
+<div data-lang="zh"><p>從<strong>共軛先驗</strong>開始，因為它們有封閉形式的後驗，能讓你不靠 MCMC 直接體會「先驗 + 資料 = 後驗」。三組最重要的共軛配對主導了大部分初探分析。</p></div>
+<div data-lang="en"><p>Start with <strong>conjugate priors</strong> — they have closed-form posteriors, letting you grasp "prior + data = posterior" without MCMC. Three pairings dominate exploratory analysis.</p></div>
+
+<div class="card-grid cols-2">
+<div class="card"><div class="card-icon">🎲</div><h4 data-zh="共軛先驗三大組合" data-en="Three Conjugate Pairs">共軛先驗三大組合</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Beta–Binomial</strong>：先驗 <code>Beta(α, β)</code>，觀察 <code>k/n</code>，後驗 <code>Beta(α+k, β+n−k)</code>。</li>
+<li><strong>Gamma–Poisson</strong>：先驗 <code>Gamma(a, b)</code>，觀察計數 <code>Σ yᵢ</code> 共 <code>n</code> 次，後驗 <code>Gamma(a+Σyᵢ, b+n)</code>。</li>
+<li><strong>Normal–Normal (已知 σ²)</strong>：先驗 <code>N(μ₀, τ₀²)</code>，後驗 <code>N(μₙ, τₙ²)</code>，<code>μₙ</code> 是先驗與樣本均值的精度加權平均。</li>
+<li><strong>意義：</strong>共軛家族讓我們以「資料量等價於虛擬樣本」的方式詮釋 α, β。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Beta–Binomial</strong>: prior <code>Beta(α, β)</code>, observe <code>k/n</code>, posterior <code>Beta(α+k, β+n−k)</code>.</li>
+<li><strong>Gamma–Poisson</strong>: prior <code>Gamma(a, b)</code>, observe <code>Σ yᵢ</code> over <code>n</code> trials, posterior <code>Gamma(a+Σyᵢ, b+n)</code>.</li>
+<li><strong>Normal–Normal (σ² known)</strong>: prior <code>N(μ₀, τ₀²)</code>, posterior <code>N(μₙ, τₙ²)</code> with <code>μₙ</code> a precision-weighted average of prior and sample mean.</li>
+<li><strong>Why it matters:</strong> conjugacy lets us read α, β as a count of "pseudo-observations" — interpretable prior strength.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🧭</div><h4 data-zh="先驗的三種類型" data-en="Three Kinds of Prior">先驗的三種類型</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Informative</strong>：根據過往實驗或文獻，有實質訊息；風險：把錯誤信念也鎖進結果。</li>
+<li><strong>Weakly informative</strong>：限制不合理範圍但不主導後驗（如 logit 上 <code>N(0, 2.5)</code>）；rstanarm / brms 預設。</li>
+<li><strong>Flat / improper</strong>：看似「無資訊」，但<em>轉換尺度後常常極具資訊量</em>——這是初學者最大的陷阱。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>Informative</strong>: real prior knowledge from earlier work; risk — bakes in any wrong beliefs.</li>
+<li><strong>Weakly informative</strong>: rules out absurd values without dominating the posterior (e.g. <code>N(0, 2.5)</code> on the logit scale); the default in rstanarm / brms.</li>
+<li><strong>Flat / improper</strong>: looks "non-informative", but is <em>often very informative on transformed scales</em> — the classic beginner trap.</li>
+</ul></div>
+</div>
+<div class="card"><div class="card-icon">🔮</div><h4 data-zh="預測分布" data-en="Predictive Distributions">預測分布</h4>
+<div data-lang="zh"><p><strong>先驗預測</strong> <code>p(ỹ) = ∫ p(ỹ|θ) p(θ) dθ</code>：「在看資料前，模型預期會看到什麼資料？」這是檢驗先驗合理性的關鍵診斷。</p>
+<p><strong>後驗預測</strong> <code>p(ỹ|y) = ∫ p(ỹ|θ) p(θ|y) dθ</code>：「給定觀察後，新資料的預期分布」——後驗預測檢查 (PPC，第 12 章) 的基礎。</p></div>
+<div data-lang="en"><p><strong>Prior predictive</strong> <code>p(ỹ) = ∫ p(ỹ|θ) p(θ) dθ</code>: "what data does the model think it will see, before any data?" Crucial sanity check for prior plausibility.</p>
+<p><strong>Posterior predictive</strong> <code>p(ỹ|y) = ∫ p(ỹ|θ) p(θ|y) dθ</code>: "given what we observed, what data should new draws look like?" — the basis of posterior predictive checks (PPC, Step 12).</p></div>
+</div>
+<div class="card"><div class="card-icon">🎯</div><h4 data-zh="點估計與決策" data-en="Point Estimates & Decisions">點估計與決策</h4>
+<div data-lang="zh"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>MAP</strong>：後驗的模 (mode)。受參數化影響，並非貝氏統計推薦的點摘要。</li>
+<li><strong>後驗均值</strong>：最小化平方損失 (squared loss)。</li>
+<li><strong>後驗中位數</strong>：最小化絕對損失；對偏態後驗較穩健。</li>
+<li><strong>決策理論：</strong>給定損失函數 <code>L(θ, a)</code>，選 <code>a*</code> 使 <code>E_{θ|y}[L(θ, a)]</code> 最小。</li>
+</ul></div>
+<div data-lang="en"><ul style="margin:8px 0 0 20px;color:var(--c-ink-light);">
+<li><strong>MAP</strong>: posterior mode. Reparameterization-dependent and not the recommended Bayesian point summary.</li>
+<li><strong>Posterior mean</strong>: minimizes squared loss.</li>
+<li><strong>Posterior median</strong>: minimizes absolute loss; robust under skew.</li>
+<li><strong>Decision theory:</strong> given loss <code>L(θ, a)</code>, pick <code>a*</code> minimizing <code>E_{θ|y}[L(θ, a)]</code>.</li>
+</ul></div>
+</div>
+</div>
+
+<div class="callout warn"><span class="callout-icon">⚠️</span><div>
+<div data-lang="zh"><strong>flat prior 不等於 non-informative：</strong>在機率 p 上取 <code>Uniform(0, 1)</code>，等價於在 log-odds 上取 <code>Logistic(0, 1)</code>——並非常數！同理，在 σ 上 flat 與在 log σ 或 σ² 上 flat 推出完全不同的後驗。<em>「無資訊先驗」是個哲學陷阱</em>，現代貝氏實務改用弱資訊先驗 (Gelman 2008)。</div>
+<div data-lang="en"><strong>Flat ≠ non-informative.</strong> A <code>Uniform(0, 1)</code> prior on a probability p is equivalent to a <code>Logistic(0, 1)</code> prior on the log-odds — not flat there. Similarly, flat on σ vs flat on log σ vs flat on σ² yield different posteriors. The phrase "non-informative prior" is a philosophical trap; modern Bayesian practice favors weakly informative priors (Gelman, 2008).</div>
+</div></div>
+</section>
+
+<!-- ===== Section 3: Interactive Beta-Binomial ===== -->
+<section class="section">
+<div class="section-label" data-zh="互動模擬" data-en="INTERACTIVE">互動模擬</div>
+<h2 data-zh="Beta–Binomial 後驗即時更新" data-en="Beta–Binomial Posterior in Real Time">Beta–Binomial 後驗即時更新</h2>
+<div data-lang="zh"><p>調整先驗 <code>α, β</code> 與觀察到的成功次數 <code>k</code>、試驗次數 <code>n</code>。藍色虛線是<strong>先驗</strong>、灰色點線是<strong>標準化概似</strong>、紅色實線是<strong>後驗</strong>。<em>慢慢調大 n</em>，看後驗如何從先驗主導變為資料主導——這就是「資料壓過先驗」的數學畫面。</p></div>
+<div data-lang="en"><p>Tune prior <code>α, β</code> and observed successes <code>k</code> out of <code>n</code> trials. Blue dashed = <strong>prior</strong>; grey dotted = <strong>scaled likelihood</strong>; red solid = <strong>posterior</strong>. <em>Slowly raise n</em> and watch the posterior swing from prior-dominated to likelihood-dominated — the picture of "data overwhelming the prior".</p></div>
+<div class="interactive-panel">
+<div class="sim-stats"><span class="sim-stat pass" id="bbPriorMean">—</span><span class="sim-stat pass" id="bbPostMean">—</span><span class="sim-stat fail" id="bbCI">—</span></div>
+<div class="slider-group"><label><span data-zh="先驗 α" data-en="Prior α">先驗 α</span> <span id="valA">2</span></label><input type="range" id="sliderA" min="1" max="50" value="2" step="1"></div>
+<div class="slider-group"><label><span data-zh="先驗 β" data-en="Prior β">先驗 β</span> <span id="valB">2</span></label><input type="range" id="sliderB" min="1" max="50" value="2" step="1"></div>
+<div class="slider-group"><label><span data-zh="成功 k" data-en="Successes k">成功 k</span> <span id="valK">7</span></label><input type="range" id="sliderK" min="0" max="100" value="7" step="1"></div>
+<div class="slider-group"><label><span data-zh="試驗 n" data-en="Trials n">試驗 n</span> <span id="valN">10</span></label><input type="range" id="sliderN" min="1" max="100" value="10" step="1"></div>
+<div class="chart-container"><canvas id="bbChart"></canvas></div>
+<p style="font-size:.82rem;color:var(--c-ink-muted);text-align:center;">X: p ∈ [0,1] | Y: density | <span data-zh="藍虛=先驗、灰點=概似、紅實=後驗" data-en="Blue dashed = prior; grey dotted = likelihood; red solid = posterior">藍虛=先驗、灰點=概似、紅實=後驗</span></p>
+</div>
+</section>
+
+<!-- ===== Section 4: Caveats ===== -->
+<section class="section">
+<div class="section-label" data-zh="陷阱與診斷" data-en="PITFALLS & DIAGNOSTICS">陷阱與診斷</div>
+<h2 data-zh="二、先驗敏感性、誤設與「貝氏並非萬靈丹」" data-en="II. Prior Sensitivity, Misspecification, and the Limits of Bayes">二、先驗敏感性與模型誤設</h2>
+
+<div data-lang="zh">
+<p><strong>先驗敏感性檢查 (prior sensitivity analysis)：</strong>同一個模型，用兩到三組合理的先驗各跑一次；若關鍵結論隨先驗大幅改變，就要在文章中明說。<em>「後驗就是後驗」</em> 只是表達貝氏一致性，並不代表它對誤設免疫——若概似模型本身錯了 (例如把計數套常態)，<em>任何</em>先驗都救不回來。</p>
+<p><strong>什麼時候先驗最重要？</strong>(a) 樣本量極小 (n &lt; 30)；(b) 模型有不可辨識性 (non-identifiable)；(c) 推導量在參數的非線性函數上 (尺度轉換後 flat prior 不再 flat)。</p>
+</div>
+<div data-lang="en">
+<p><strong>Prior sensitivity analysis:</strong> re-run the model under two or three defensible priors; if the key conclusion shifts noticeably, disclose this in your paper. The slogan <em>"the posterior is what it is"</em> states Bayesian coherence — it does <em>not</em> mean the model is immune to misspecification. If your likelihood is wrong (e.g. Gaussian on counts), no prior can save you.</p>
+<p><strong>When do priors matter most?</strong> (a) Small n (n &lt; 30); (b) non-identifiable models; (c) inference on nonlinear functions of parameters (flat is rarely flat after a transform).</p>
+</div>
+
+<div class="callout danger"><span class="callout-icon">🚫</span><div>
+<span data-lang="zh"><strong>常見錯誤：</strong>把 <code>Uniform(0, 1e6)</code> 加在變異數參數上自稱「無資訊」。<em>這對小變異數區段其實非常不公平</em>——它把絕大部分機率質量壓在很大的變異數上。建議改用 half-Normal 或 half-Cauchy on σ。</span>
+<span data-lang="en"><strong>Common mistake:</strong> slapping <code>Uniform(0, 1e6)</code> on a variance parameter and calling it "non-informative". This is in fact wildly unfair to small variances — almost all probability mass sits on large values. Use a half-Normal or half-Cauchy on σ instead.</span>
+</div></div>
+</section>
+
+<!-- ===== Section 5: Decision Guide ===== -->
+<section class="section">
+<div class="section-label" data-zh="決策引導" data-en="DECISION GUIDE">決策引導</div>
+<h2 data-zh="三、先驗選擇決策樹" data-en="III. A Decision Tree for Choosing Priors">三、先驗選擇決策樹</h2>
+
+<div class="decision-tree">
+<h4>🌳 <span data-zh="先驗選擇流程" data-en="Prior Selection Flow">先驗選擇流程</span></h4>
+<div data-lang="zh">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>你是否有<strong>過往實驗 / 文獻</strong>提供 θ 的合理範圍？<span class="dt-arrow">→ 是 →</span> informative prior（如 <code>Beta(20, 80)</code> 表示「過去看過約 100 例，平均 20% 陽性」）；否 → Q2。</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>模型是 GLM (logistic / Poisson)？<span class="dt-arrow">→ 是 →</span> 對係數採 weakly informative：<code>N(0, 2.5)</code> on logit；<code>N(0, 2)</code> on log-rate。</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>是變異數 / 標準差？<span class="dt-arrow">→ 是 →</span> half-Normal 或 half-Cauchy on σ (Gelman 推薦)；不要用 Uniform(0, 大數)。</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>樣本量小 (n &lt; 30)？<span class="dt-arrow">→ 是 →</span> 一定要做<strong>先驗敏感性檢查</strong>，並在報告中註明。</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>你關心的量是 θ 的<strong>非線性函數</strong> (如 hazard ratio、ROC AUC)？<span class="dt-arrow">→ 是 →</span> 跑先驗預測模擬，確認推導量分布也合理。</div></div>
+</div>
+<div data-lang="en">
+<div class="dt-node"><span class="dt-q">Q1:</span><div>Do you have <strong>prior experiments / literature</strong> giving a plausible range for θ? <span class="dt-arrow">→ Yes →</span> informative prior (e.g. <code>Beta(20, 80)</code> = "~100 prior cases, ~20% positive"); otherwise → Q2.</div></div>
+<div class="dt-node"><span class="dt-q">Q2:</span><div>GLM (logistic / Poisson)? <span class="dt-arrow">→ Yes →</span> weakly informative on coefficients: <code>N(0, 2.5)</code> on the logit scale; <code>N(0, 2)</code> on log-rate.</div></div>
+<div class="dt-node"><span class="dt-q">Q3:</span><div>A variance / SD parameter? <span class="dt-arrow">→ Yes →</span> half-Normal or half-Cauchy on σ (Gelman). Avoid <code>Uniform(0, big)</code>.</div></div>
+<div class="dt-node"><span class="dt-q">Q4:</span><div>Small sample (n &lt; 30)? <span class="dt-arrow">→ Yes →</span> <strong>always</strong> run a prior-sensitivity check and report it.</div></div>
+<div class="dt-node"><span class="dt-q">Q5:</span><div>Care about a <strong>nonlinear function</strong> of θ (hazard ratio, ROC AUC)? <span class="dt-arrow">→ Yes →</span> run prior predictive simulation and verify the derived quantity also looks reasonable.</div></div>
+</div>
+</div>
+
+<table class="comp-table">
+<thead><tr>
+<th data-zh="情境" data-en="Scenario">情境</th>
+<th data-zh="推薦先驗" data-en="Recommended Prior">先驗</th>
+<th data-zh="備註" data-en="Note">備註</th>
+</tr></thead>
+<tbody>
+<tr><td data-lang="zh">A/B 測試成功率 (Bayesian A/B)</td><td data-lang="zh">Beta(1, 1) 或 Beta(2, 2)</td><td data-lang="zh">小樣本先驗強度可換算為「虛擬樣本」</td><td data-lang="en">A/B success rate</td><td data-lang="en">Beta(1, 1) or Beta(2, 2)</td><td data-lang="en">prior strength = pseudo-counts</td></tr>
+<tr><td data-lang="zh">CRISPR screen log fold change</td><td data-lang="zh">N(0, 2) 或 Cauchy(0, 1)</td><td data-lang="zh">弱訊息、容許大效應</td><td data-lang="en">CRISPR screen log fold change</td><td data-lang="en">N(0, 2) or Cauchy(0, 1)</td><td data-lang="en">weakly informative, allows big effects</td></tr>
+<tr><td data-lang="zh">RNA-seq NB dispersion</td><td data-lang="zh">log-Normal(−3, 1)</td><td data-lang="zh">DESeq2 風格的 trended prior</td><td data-lang="en">RNA-seq NB dispersion</td><td data-lang="en">log-Normal(−3, 1)</td><td data-lang="en">DESeq2-style trended prior</td></tr>
+<tr><td data-lang="zh">Hierarchical 變異成分 σ</td><td data-lang="zh">half-Normal(0, 1) 或 half-Cauchy(0, 2.5)</td><td data-lang="zh">避免 Uniform(0, 大)</td><td data-lang="en">Hierarchical σ component</td><td data-lang="en">half-Normal(0, 1) or half-Cauchy(0, 2.5)</td><td data-lang="en">avoid Uniform(0, big)</td></tr>
+<tr><td data-lang="zh">GWAS Bayesian (bglr)</td><td data-lang="zh">spike-and-slab, BayesB</td><td data-lang="zh">少數大效應 + 多數零效應</td><td data-lang="en">GWAS Bayesian (bglr)</td><td data-lang="en">spike-and-slab, BayesB</td><td data-lang="en">few large, many null effects</td></tr>
+</tbody></table>
+</section>
+
+<!-- ===== Section 6: Code ===== -->
+<section class="section">
+<div class="section-label" data-zh="程式碼" data-en="CODE">程式碼</div>
+<h2 data-zh="實作：封閉解 + rstanarm / PyMC" data-en="Code: Closed Form + rstanarm / PyMC">實作：封閉解 + 機率程式</h2>
+<div class="code-tabs"><div class="code-tab-btns"><button class="code-tab-btn active" onclick="switchTab(this,'r1')">R</button><button class="code-tab-btn" onclick="switchTab(this,'py1')">Python</button></div>
+<div class="code-tab-content active" id="r1"><pre><span class="comment"># --- R --- Beta–Binomial 封閉解</span>
+a &lt;- <span class="num">2</span>; b &lt;- <span class="num">2</span>; k &lt;- <span class="num">7</span>; n &lt;- <span class="num">10</span>
+<span class="comment"># 後驗 = Beta(a+k, b+n-k)</span>
+post_a &lt;- a + k; post_b &lt;- b + n - k
+<span class="func">curve</span>(<span class="func">dbeta</span>(x, a, b),       from=<span class="num">0</span>, to=<span class="num">1</span>, col=<span class="str">"steelblue"</span>, lty=<span class="num">2</span>, ylab=<span class="str">"density"</span>)
+<span class="func">curve</span>(<span class="func">dbeta</span>(x, post_a, post_b), add=TRUE, col=<span class="str">"firebrick"</span>, lwd=<span class="num">2</span>)
+<span class="func">qbeta</span>(<span class="func">c</span>(<span class="num">.025</span>, <span class="num">.975</span>), post_a, post_b)   <span class="comment"># 95% credible interval</span>
+
+<span class="comment"># --- 一般化：rstanarm logistic + 弱資訊先驗</span>
+<span class="func">library</span>(rstanarm)
+fit &lt;- <span class="func">stan_glm</span>(y ~ x, data=df, family=binomial(),
+                prior = <span class="func">normal</span>(<span class="num">0</span>, <span class="num">2.5</span>),
+                prior_intercept = <span class="func">normal</span>(<span class="num">0</span>, <span class="num">5</span>),
+                chains=<span class="num">4</span>, iter=<span class="num">2000</span>)
+<span class="func">prior_summary</span>(fit)                  <span class="comment"># 確認先驗設定</span>
+<span class="func">posterior_interval</span>(fit, prob=<span class="num">.95</span>)   <span class="comment"># 95% credible</span>
+<span class="func">posterior_predict</span>(fit, draws=<span class="num">500</span>)    <span class="comment"># 後驗預測抽樣</span>
+
+<span class="comment"># --- 先驗敏感性：兩組先驗對照</span>
+fit2 &lt;- <span class="func">update</span>(fit, prior = <span class="func">normal</span>(<span class="num">0</span>, <span class="num">10</span>))
+<span class="func">cbind</span>(<span class="func">coef</span>(fit), <span class="func">coef</span>(fit2))</pre></div>
+<div class="code-tab-content" id="py1"><pre><span class="comment"># --- Python ---</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np, scipy.stats <span class="kw">as</span> st
+<span class="kw">import</span> pymc <span class="kw">as</span> pm, arviz <span class="kw">as</span> az
+
+<span class="comment"># 1) Beta-Binomial 封閉解</span>
+a, b, k, n = <span class="num">2</span>, <span class="num">2</span>, <span class="num">7</span>, <span class="num">10</span>
+post = st.beta(a + k, b + n - k)
+print(post.mean(), post.interval(<span class="num">0.95</span>))
+
+<span class="comment"># 2) PyMC：先驗預測 → 抽樣 → 後驗預測</span>
+<span class="kw">with</span> pm.Model() <span class="kw">as</span> m:
+    p   = pm.Beta(<span class="str">"p"</span>, alpha=<span class="num">2</span>, beta=<span class="num">2</span>)
+    obs = pm.Binomial(<span class="str">"y"</span>, n=n, p=p, observed=k)
+    prior_pred = pm.sample_prior_predictive(<span class="num">1000</span>)
+    idata      = pm.sample(<span class="num">2000</span>, tune=<span class="num">1000</span>, chains=<span class="num">4</span>, target_accept=<span class="num">0.9</span>)
+    post_pred  = pm.sample_posterior_predictive(idata)
+
+az.summary(idata, hdi_prob=<span class="num">0.95</span>)
+az.plot_posterior(idata, var_names=[<span class="str">"p"</span>])
+az.plot_dist_comparison(idata, var_names=[<span class="str">"p"</span>])   <span class="comment"># prior vs posterior</span>
+
+<span class="comment"># 3) 先驗敏感性</span>
+<span class="kw">with</span> pm.Model() <span class="kw">as</span> m_flat:
+    p2 = pm.Beta(<span class="str">"p"</span>, <span class="num">1</span>, <span class="num">1</span>)
+    pm.Binomial(<span class="str">"y"</span>, n=n, p=p2, observed=k)
+    idata2 = pm.sample()
+az.compare({<span class="str">"prior_Beta22"</span>:idata, <span class="str">"prior_Beta11"</span>:idata2})</pre></div>
+</div>
+</section>
+
+<!-- ===== Section 7: Quiz ===== -->
+<section class="quiz-section">
+<h3>📝 <span data-zh="自我檢測" data-en="Self-Check">自我檢測</span></h3>
+<div class="quiz-q" data-answer="1">
+<p data-lang="zh">1. 為什麼「機率 p 上的均勻先驗」與「log-odds 上的均勻先驗」並不等價？</p>
+<p data-lang="en">1. Why is a uniform prior on a probability not the same as a uniform prior on its log-odds?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 兩者其實一樣，只是寫法不同</span><span data-lang="en">A. They are actually the same, just written differently</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. 變數變換需要 Jacobian，平的密度在轉換尺度上不再平</span><span data-lang="en">B. Variable transformation introduces a Jacobian — a flat density on one scale is not flat on the other</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. log-odds 不存在機率分布</span><span data-lang="en">C. The log-odds has no probability distribution</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 因為 logistic 是奇函數</span><span data-lang="en">D. Because logistic is an odd function</span></div>
+</div><div class="quiz-feedback" id="fb1"></div></div>
+
+<div class="quiz-q" data-answer="2">
+<p data-lang="zh">2. Poisson 速率 λ 的共軛先驗以及後驗形式是？</p>
+<p data-lang="en">2. State the conjugate prior for the Poisson rate and the resulting posterior.</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. Beta 先驗 → Beta 後驗</span><span data-lang="en">A. Beta prior → Beta posterior</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. Normal 先驗 → Normal 後驗</span><span data-lang="en">B. Normal prior → Normal posterior</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. Gamma(a, b) 先驗 → Gamma(a + Σyᵢ, b + n) 後驗</span><span data-lang="en">C. Gamma(a, b) prior → Gamma(a + Σyᵢ, b + n) posterior</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. Cauchy 先驗 → Cauchy 後驗</span><span data-lang="en">D. Cauchy prior → Cauchy posterior</span></div>
+</div><div class="quiz-feedback" id="fb2"></div></div>
+
+<div class="quiz-q" data-answer="0">
+<p data-lang="zh">3. 先驗選擇影響最大的時刻是？</p>
+<p data-lang="en">3. When does prior choice matter most?</p>
+<div class="quiz-options">
+<div class="quiz-opt" data-idx="0"><span data-lang="zh">A. 小樣本、非識別性模型、或關心非線性推導量時</span><span data-lang="en">A. Small samples, non-identifiable models, or inference on nonlinear functions of θ</span></div>
+<div class="quiz-opt" data-idx="1"><span data-lang="zh">B. n &gt; 10⁶ 時</span><span data-lang="en">B. When n > 10⁶</span></div>
+<div class="quiz-opt" data-idx="2"><span data-lang="zh">C. 任何時候都一樣重要</span><span data-lang="en">C. It is equally important in every regime</span></div>
+<div class="quiz-opt" data-idx="3"><span data-lang="zh">D. 永遠不重要——資料總會壓過先驗</span><span data-lang="en">D. It never matters — data always overwhelm the prior</span></div>
+</div><div class="quiz-feedback" id="fb3"></div></div>
+</section>
+
+<nav class="page-nav">
+<a href="glm-count-models.html"><span class="nav-dir" data-zh="← 上一步" data-en="← Previous">← 上一步</span><span class="nav-title">Step 9: GLM & Count Models</span></a>
+<a href="mcmc-diagnostics.html"><span class="nav-dir" data-zh="下一步 →" data-en="Next →">下一步 →</span><span class="nav-title">Step 11: MCMC & Diagnostics</span></a>
+</nav>
+</main>
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial</footer>
+<script src="i18n.js"></script>
+<script>
+window.addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('progressBar').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight))*100+'%';});
+function switchTab(b,id){const p=b.closest('.code-tabs');p.querySelectorAll('.code-tab-btn').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.code-tab-content').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(id).classList.add('active');}
+
+// --- log-gamma & Beta density ---
+function lgamma(x){let g=0;while(x<7){g-=Math.log(x);x++}let z=1/(x*x);return g+(x-0.5)*Math.log(x)-x+0.5*Math.log(2*Math.PI)+(1/12-z/(360-z*z/1.5))/x;}
+function logBeta(a,b){return lgamma(a)+lgamma(b)-lgamma(a+b);}
+function dbeta(x,a,b){if(x<=0||x>=1)return 0;return Math.exp((a-1)*Math.log(x)+(b-1)*Math.log(1-x)-logBeta(a,b));}
+// scaled likelihood ~ Beta(k+1, n-k+1) up to normalization
+function scaledLik(x,k,n){return dbeta(x,k+1,n-k+1);}
+
+const GRID=Array.from({length:201},(_,i)=>i/200);
+const bbChart=new Chart(document.getElementById('bbChart'),{type:'line',data:{labels:GRID.map(x=>x.toFixed(2)),datasets:[
+  {label:'Prior',data:[],borderColor:'rgba(52,109,180,0.9)',borderDash:[6,4],borderWidth:2,pointRadius:0,tension:0.2},
+  {label:'Likelihood (scaled)',data:[],borderColor:'rgba(120,120,120,0.85)',borderDash:[2,3],borderWidth:1.8,pointRadius:0,tension:0.2},
+  {label:'Posterior',data:[],borderColor:'rgba(192,57,43,0.95)',backgroundColor:'rgba(192,57,43,0.12)',borderWidth:2.5,pointRadius:0,tension:0.2,fill:true}
+]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{title:{display:true,text:'p'},ticks:{maxTicksLimit:11}},y:{title:{display:true,text:'density'},beginAtZero:true}}}});
+
+function updateBB(){
+  const a=+document.getElementById('sliderA').value;
+  const b=+document.getElementById('sliderB').value;
+  let n=+document.getElementById('sliderN').value;
+  let k=+document.getElementById('sliderK').value;
+  if(k>n){k=n;document.getElementById('sliderK').value=n;}
+  document.getElementById('valA').textContent=a;
+  document.getElementById('valB').textContent=b;
+  document.getElementById('valK').textContent=k;
+  document.getElementById('valN').textContent=n;
+  const pa=a+k, pb=b+n-k;
+  const prior=GRID.map(x=>dbeta(x,a,b));
+  const lik  =GRID.map(x=>scaledLik(x,k,n));
+  const post =GRID.map(x=>dbeta(x,pa,pb));
+  bbChart.data.datasets[0].data=prior;
+  bbChart.data.datasets[1].data=lik;
+  bbChart.data.datasets[2].data=post;
+  bbChart.update('none');
+  // posterior mean & approx 95% CI (using grid)
+  const priorMean=a/(a+b);
+  const postMean=pa/(pa+pb);
+  // approximate quantiles via grid CDF
+  let cdf=0,lo=null,hi=null,total=0;
+  for(let i=0;i<GRID.length;i++)total+=post[i];
+  for(let i=0;i<GRID.length;i++){cdf+=post[i]/total;if(lo===null&&cdf>=0.025)lo=GRID[i];if(hi===null&&cdf>=0.975){hi=GRID[i];break;}}
+  const L=I18n.get();
+  document.getElementById('bbPriorMean').textContent=(L==='zh'?'先驗均值 ':'Prior mean ')+priorMean.toFixed(3);
+  document.getElementById('bbPostMean').textContent =(L==='zh'?'後驗均值 ':'Posterior mean ')+postMean.toFixed(3);
+  document.getElementById('bbCI').textContent       =(L==='zh'?'95% 可信區間 [':'95% CrI [')+lo.toFixed(2)+', '+hi.toFixed(2)+']';
+}
+['sliderA','sliderB','sliderK','sliderN'].forEach(id=>document.getElementById(id).addEventListener('input',updateBB));
+document.addEventListener('langchange',updateBB);
+updateBB();
+
+// --- Quiz ---
+const QF={
+  zh:{q1_y:'機率密度在變數變換時要乘上 Jacobian，所以 p 上 flat ≠ logit(p) 上 flat。',q1_n:'正確答案已標示。',q2_y:'Gamma 是 Poisson 速率的共軛先驗，後驗仍是 Gamma，參數加上總計數與樣本量。',q2_n:'正確答案已標示。',q3_y:'小樣本、不可辨識模型、與非線性推導量是先驗最敏感的三大場景。',q3_n:'正確答案已標示。'},
+  en:{q1_y:'A Jacobian appears under variable change — flat on p is not flat on logit(p).',q1_n:'Correct answer highlighted.',q2_y:'Gamma is conjugate to Poisson; the posterior remains Gamma with updated shape/rate.',q2_n:'Correct answer highlighted.',q3_y:'Small n, non-identifiable models, and nonlinear derived quantities are the three regimes where priors bite hardest.',q3_n:'Correct answer highlighted.'}
+};
+document.querySelectorAll('.quiz-q').forEach((q,qi)=>{const ans=+q.dataset.answer;q.querySelectorAll('.quiz-opt').forEach(o=>{o.addEventListener('click',()=>{if(q.classList.contains('answered'))return;q.classList.add('answered');const fb=document.getElementById('fb'+(qi+1));const ok=+o.dataset.idx===ans;o.classList.add(ok?'correct':'wrong');if(!ok)q.querySelectorAll('.quiz-opt')[ans].classList.add('correct');const L=I18n.get();fb.className='quiz-feedback show '+(ok?'correct-fb':'wrong-fb');fb.textContent=(ok?'✅ ':'❌ ')+(QF[L]['q'+(qi+1)+'_'+(ok?'y':'n')]||'');});});});
+</script>
+</body></html>

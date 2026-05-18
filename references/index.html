@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Statistical Inference · References</title>
+<meta name="description" content="Canonical books, original papers and package documentation for the 17-topic Statistical Inference Interactive Tutorial.">
+<link rel="stylesheet" href="../styles.css">
+<style>
+.ref-list{list-style:none;padding:0;margin:14px 0 0}
+.ref-list li{padding:14px 16px;background:var(--c-surface-alt);border:1px solid var(--c-border-light);border-radius:var(--radius);margin-bottom:10px;font-size:.92rem;line-height:1.65}
+.ref-list li:hover{background:var(--c-surface);border-color:var(--c-border)}
+.ref-tag{display:inline-block;font-family:var(--font-mono);font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:6px;margin-right:8px;letter-spacing:.5px}
+.ref-tag.paper{background:var(--c-accent-light);color:var(--c-accent-dark)}
+.ref-tag.doc{background:#e3f2fd;color:#1565c0}
+.ref-tag.bench{background:#fff3e0;color:#e65100}
+.ref-tag.bestp{background:var(--c-highlight-light);color:#a06a00;border:1px solid var(--c-highlight)}
+.ref-tag.book{background:#f3e5f5;color:#6a1b9a}
+.ref-author{color:var(--c-ink);font-weight:600}
+.ref-title{color:var(--c-ink);font-weight:500}
+.ref-meta{color:var(--c-ink-muted);font-size:.85rem;margin-top:4px;display:block}
+.ref-list a{color:var(--c-accent);text-decoration:none;border-bottom:1px dotted var(--c-accent)}
+.ref-list a:hover{color:var(--c-accent-dark);border-bottom-style:solid}
+.toc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:18px 0}
+.toc-grid a{padding:10px 14px;background:var(--c-surface);border:1px solid var(--c-border-light);border-radius:var(--radius);text-decoration:none;color:var(--c-ink);font-size:.88rem;transition:var(--transition);display:flex;align-items:center;gap:8px}
+.toc-grid a:hover{border-color:var(--c-accent);background:var(--c-accent-light);color:var(--c-accent-dark)}
+.toc-grid a .step-tag{font-family:var(--font-mono);font-size:.72rem;color:var(--c-accent);font-weight:600}
+.section-anchor{scroll-margin-top:80px}
+</style>
+</head>
+<body>
+
+<nav class="top-nav"><div class="top-nav-inner">
+  <a href="../index.html" class="top-nav-brand"><span>📊</span> <span data-zh="統計推論教學" data-en="Statistical Inference">統計推論教學</span></a>
+  <ul class="top-nav-links">
+    <li><a href="../probability-and-distributions.html">Prob.</a></li>
+    <li><a href="../point-estimation.html">Est.</a></li>
+    <li><a href="../confidence-intervals-bootstrap.html">CI</a></li>
+    <li><a href="../hypothesis-testing.html">HT</a></li>
+    <li><a href="../common-tests.html">Tests</a></li>
+    <li><a href="../linear-regression.html">LM</a></li>
+    <li><a href="../anova-mixed-models.html">ANOVA</a></li>
+    <li><a href="../logistic-regression.html">Logit</a></li>
+    <li><a href="../glm-count-models.html">GLM</a></li>
+    <li><a href="../bayes-priors-posteriors.html">Bayes</a></li>
+    <li><a href="../mcmc-diagnostics.html">MCMC</a></li>
+    <li><a href="../posterior-summaries.html">Post.</a></li>
+    <li><a href="../empirical-bayes-limma.html">EB</a></li>
+    <li><a href="../multiple-testing-fdr.html">FDR</a></li>
+    <li><a href="../de-statistics.html">DE</a></li>
+    <li><a href="../permutation-gsea.html">Perm.</a></li>
+    <li><a href="../survival-analysis.html">Surv.</a></li>
+    <li><a href="index.html" class="active" style="font-weight:700" data-zh="📚 參考資料" data-en="📚 References">📚 參考資料</a></li>
+  </ul>
+</div></nav>
+
+<header class="page-hero">
+<div class="step-badge" data-zh="參考資料 · REFERENCES" data-en="REFERENCES">參考資料 · REFERENCES</div>
+<h1 data-zh="權威書籍、原始論文與套件文件" data-en="Canonical Books, Original Papers, and Package Docs">權威書籍、原始論文與套件文件</h1>
+<p class="subtitle" data-lang="zh">為 Statistical Inference Interactive Tutorial 17 個主題完整佐證的學術出處，附 DOI 連結。</p>
+<p class="subtitle" data-lang="en">Fully cited sources for all 17 modules of the Statistical Inference Interactive Tutorial, with DOI links.</p>
+</header>
+
+<main class="content-wrap">
+
+<!-- Overview -->
+<section class="section">
+<div class="section-label" data-zh="概覽" data-en="OVERVIEW">概覽</div>
+<h2 data-zh="如何使用這份資料？" data-en="How to use this list">如何使用這份資料？</h2>
+<div data-lang="zh"><p>本頁針對教學中提到的每個概念、檢定、套件與演算法整理學術出處。引用標籤含義：</p></div>
+<div data-lang="en"><p>For every concept, test, package, and algorithm mentioned in the tutorial, this page lists the canonical source. Tag legend:</p></div>
+<div class="card-grid cols-3">
+  <div class="card"><div class="card-icon" style="background:#f3e5f5">📚</div><h4>Book</h4><p data-lang="zh">教科書 / 線上免費書</p><p data-lang="en">Textbooks / free online books</p></div>
+  <div class="card"><div class="card-icon" style="background:var(--c-accent-light)">📄</div><h4>Paper</h4><p data-lang="zh">原始論文（含 DOI / PubMed）</p><p data-lang="en">Original papers (with DOI / PubMed)</p></div>
+  <div class="card"><div class="card-icon" style="background:#e3f2fd">📘</div><h4>Doc</h4><p data-lang="zh">官方文件、vignette、tutorial</p><p data-lang="en">Official docs, vignettes, tutorials</p></div>
+  <div class="card"><div class="card-icon" style="background:var(--c-highlight-light)">⭐</div><h4>Best Practice</h4><p data-lang="zh">綜述與 community 推薦</p><p data-lang="en">Reviews and community recommendations</p></div>
+  <div class="card"><div class="card-icon" style="background:#fff3e0">📊</div><h4>Benchmark</h4><p data-lang="zh">獨立 benchmarking 評比</p><p data-lang="en">Independent benchmarking studies</p></div>
+</div>
+
+<h3 data-zh="本頁目錄" data-en="Table of Contents">本頁目錄</h3>
+<div class="toc-grid">
+  <a href="#foundations"><span class="step-tag">★</span><span data-zh="核心教科書" data-en="Core Textbooks">核心教科書</span></a>
+  <a href="#prob"><span class="step-tag">Step 1</span><span>Probability / Distributions</span></a>
+  <a href="#estimation"><span class="step-tag">Step 2</span><span>Point Estimation</span></a>
+  <a href="#ci"><span class="step-tag">Step 3</span><span>CI / Bootstrap</span></a>
+  <a href="#ht"><span class="step-tag">Step 4</span><span>Hypothesis Testing</span></a>
+  <a href="#tests"><span class="step-tag">Step 5</span><span>Common Tests</span></a>
+  <a href="#lm"><span class="step-tag">Step 6</span><span>Linear Regression</span></a>
+  <a href="#mixed"><span class="step-tag">Step 7</span><span>ANOVA / Mixed</span></a>
+  <a href="#logit"><span class="step-tag">Step 8</span><span>Logistic</span></a>
+  <a href="#glm"><span class="step-tag">Step 9</span><span>GLM Counts</span></a>
+  <a href="#bayes"><span class="step-tag">Step 10</span><span>Bayes Basics</span></a>
+  <a href="#mcmc"><span class="step-tag">Step 11</span><span>MCMC / HMC</span></a>
+  <a href="#postsum"><span class="step-tag">Step 12</span><span>Posterior / PPC</span></a>
+  <a href="#eb"><span class="step-tag">Step 13</span><span>Empirical Bayes</span></a>
+  <a href="#fdr"><span class="step-tag">Step 14</span><span>FDR</span></a>
+  <a href="#de"><span class="step-tag">Step 15</span><span>DE Statistics</span></a>
+  <a href="#perm"><span class="step-tag">Step 16</span><span>Permutation / GSEA</span></a>
+  <a href="#surv"><span class="step-tag">Step 17</span><span>Survival</span></a>
+</div>
+</section>
+
+<!-- ===================== Foundations ===================== -->
+<section class="section section-anchor" id="foundations">
+<div class="section-label" data-zh="核心教科書" data-en="CORE TEXTBOOKS">核心教科書</div>
+<h2>⭐ <span data-zh="貫穿全教程的權威教科書" data-en="Authoritative textbooks for the whole tutorial">貫穿全教程的權威教科書</span></h2>
+<p data-lang="zh">這幾本書幾乎覆蓋了本教程所有章節的理論基礎，是進階學習的最佳起點。</p>
+<p data-lang="en">These books cover the theoretical foundation of nearly every topic in this tutorial — the best starting point for going deeper.</p>
+<ul class="ref-list">
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">Wasserman L.</span> <span class="ref-title">All of Statistics: A Concise Course in Statistical Inference.</span> Springer (2004).<span class="ref-meta">DOI: <a href="https://doi.org/10.1007/978-0-387-21736-9" target="_blank" rel="noopener">10.1007/978-0-387-21736-9</a> · <span data-lang="zh">頻率學派與貝氏的快速入門</span><span data-lang="en">Fast-paced intro to frequentist & Bayesian</span></span></li>
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">Casella G, Berger RL.</span> <span class="ref-title">Statistical Inference, 2nd ed.</span> Duxbury (2002).<span class="ref-meta"><span data-lang="zh">研究所機率與統計的標準教科書</span><span data-lang="en">The graduate-level standard text</span></span></li>
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">Efron B, Hastie T.</span> <span class="ref-title">Computer Age Statistical Inference: Algorithms, Evidence and Data Science.</span> Cambridge UP (2016).<span class="ref-meta"><a href="https://hastie.su.domains/CASI/" target="_blank" rel="noopener">hastie.su.domains/CASI</a> (<span data-lang="zh">免費 PDF</span><span data-lang="en">free PDF</span>)</span></li>
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">Gelman A, Carlin JB, Stern HS, Dunson DB, Vehtari A, Rubin DB.</span> <span class="ref-title">Bayesian Data Analysis (BDA3), 3rd ed.</span> CRC (2013).<span class="ref-meta"><a href="http://www.stat.columbia.edu/~gelman/book/" target="_blank" rel="noopener">stat.columbia.edu/~gelman/book</a> (<span data-lang="zh">免費 PDF</span><span data-lang="en">free PDF</span>)</span></li>
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">McElreath R.</span> <span class="ref-title">Statistical Rethinking: A Bayesian Course with Examples in R and Stan, 2nd ed.</span> CRC (2020).<span class="ref-meta"><span data-lang="zh">最受歡迎的貝氏統計入門</span><span data-lang="en">The most-loved Bayesian intro</span></span></li>
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">Murphy KP.</span> <span class="ref-title">Probabilistic Machine Learning: An Introduction.</span> MIT Press (2022).<span class="ref-meta"><a href="https://probml.github.io/pml-book/" target="_blank" rel="noopener">probml.github.io/pml-book</a> (<span data-lang="zh">免費 PDF</span><span data-lang="en">free PDF</span>)</span></li>
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">Efron B.</span> <span class="ref-title">Large-Scale Inference: Empirical Bayes Methods for Estimation, Testing, and Prediction.</span> Cambridge UP (2010).<span class="ref-meta"><span data-lang="zh">基因體尺度檢定的奠基之作</span><span data-lang="en">Foundational for genomic-scale inference</span></span></li>
+  <li><span class="ref-tag book">📚 BOOK</span><span class="ref-author">Harrell FE.</span> <span class="ref-title">Regression Modeling Strategies, 2nd ed.</span> Springer (2015).<span class="ref-meta">DOI: <a href="https://doi.org/10.1007/978-3-319-19425-7" target="_blank" rel="noopener">10.1007/978-3-319-19425-7</a> · <span data-lang="zh">臨床/生物統計建模的權威</span><span data-lang="en">Authoritative for clinical/biostat modeling</span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 1: Probability & Distributions ============= -->
+<section class="section section-anchor" id="prob">
+<div class="section-label">Step 1</div>
+<h2>🎲 <span data-zh="機率與分布" data-en="Probability & Distributions">機率與分布</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Anders S, Huber W.</span> <span class="ref-title">Differential expression analysis for sequence count data.</span> <em>Genome Biology</em> 11:R106 (2010).<span class="ref-meta">DOI: <a href="https://doi.org/10.1186/gb-2010-11-10-r106" target="_blank" rel="noopener">10.1186/gb-2010-11-10-r106</a> · <span data-lang="zh">NB 應用於 RNA-seq 的奠基論文</span><span data-lang="en">Foundational NB-for-RNA-seq paper</span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-title">Wasserman, Ch. 1–3 · Casella & Berger Ch. 2–4 · Efron & Hastie Ch. 1</span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R Documentation — <code>Distributions</code></span><span class="ref-meta"><span data-lang="zh"><a href="https://stat.ethz.ch/R-manual/R-devel/library/stats/html/Distributions.html" target="_blank" rel="noopener">stat.ethz.ch/R-manual</a> · scipy.stats <a href="https://docs.scipy.org/doc/scipy/reference/stats.html" target="_blank" rel="noopener">docs</a></span><span data-lang="en"><a href="https://stat.ethz.ch/R-manual/R-devel/library/stats/html/Distributions.html" target="_blank" rel="noopener">stat.ethz.ch/R-manual</a> · scipy.stats <a href="https://docs.scipy.org/doc/scipy/reference/stats.html" target="_blank" rel="noopener">docs</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 2: Point Estimation ============= -->
+<section class="section section-anchor" id="estimation">
+<div class="section-label">Step 2</div>
+<h2>🎯 <span data-zh="點估計與抽樣分布" data-en="Point Estimation & Sampling Distributions">點估計與抽樣分布</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag book">📚</span><span class="ref-title">Casella & Berger Ch. 7 · Wasserman Ch. 9</span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">James W, Stein C.</span> <span class="ref-title">Estimation with quadratic loss.</span> <em>Proc 4th Berkeley Symp</em> 1:361–379 (1961). <span class="ref-meta"><span data-lang="zh">James-Stein 收縮估計奠基</span><span data-lang="en">Founding paper on shrinkage</span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Efron B.</span> <span class="ref-title">Bootstrap methods: another look at the jackknife.</span> <em>Annals of Statistics</em> 7(1):1–26 (1979).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1214/aos/1176344552" target="_blank" rel="noopener">10.1214/aos/1176344552</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1214/aos/1176344552" target="_blank" rel="noopener">10.1214/aos/1176344552</a></span></span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title"><code>MASS::fitdistr</code></span><span class="ref-meta"><span data-lang="zh"><a href="https://cran.r-project.org/web/packages/MASS/index.html" target="_blank" rel="noopener">CRAN MASS</a></span><span data-lang="en"><a href="https://cran.r-project.org/web/packages/MASS/index.html" target="_blank" rel="noopener">CRAN MASS</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 3: CI / Bootstrap ============= -->
+<section class="section section-anchor" id="ci">
+<div class="section-label">Step 3</div>
+<h2>📏 <span data-zh="信賴區間與 Bootstrap" data-en="Confidence Intervals & Bootstrap">信賴區間與 Bootstrap</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Efron B, Tibshirani RJ.</span> <span class="ref-title">An Introduction to the Bootstrap.</span> CRC (1993).</li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Davison AC, Hinkley DV.</span> <span class="ref-title">Bootstrap Methods and Their Application.</span> Cambridge UP (1997).</li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">DiCiccio TJ, Efron B.</span> <span class="ref-title">Bootstrap confidence intervals.</span> <em>Statistical Science</em> 11(3):189–228 (1996).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1214/ss/1032280214" target="_blank" rel="noopener">10.1214/ss/1032280214</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1214/ss/1032280214" target="_blank" rel="noopener">10.1214/ss/1032280214</a></span></span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>boot</code> package</span><span class="ref-meta"><span data-lang="zh"><a href="https://cran.r-project.org/web/packages/boot/" target="_blank" rel="noopener">CRAN boot</a> · scipy <code>bootstrap</code> <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html" target="_blank" rel="noopener">docs</a></span><span data-lang="en"><a href="https://cran.r-project.org/web/packages/boot/" target="_blank" rel="noopener">CRAN boot</a> · scipy <code>bootstrap</code> <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html" target="_blank" rel="noopener">docs</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 4: Hypothesis Testing ============= -->
+<section class="section section-anchor" id="ht">
+<div class="section-label">Step 4</div>
+<h2>⚖️ <span data-zh="假設檢定與錯誤" data-en="Hypothesis Testing & Errors">假設檢定與錯誤</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag bestp">⭐ ASA</span><span class="ref-author">Wasserstein RL, Lazar NA.</span> <span class="ref-title">The ASA's statement on p-values: context, process, and purpose.</span> <em>The American Statistician</em> 70(2):129–133 (2016).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1080/00031305.2016.1154108" target="_blank" rel="noopener">10.1080/00031305.2016.1154108</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1080/00031305.2016.1154108" target="_blank" rel="noopener">10.1080/00031305.2016.1154108</a></span></span></li>
+  <li><span class="ref-tag bestp">⭐</span><span class="ref-author">Greenland S, Senn SJ, Rothman KJ, et al.</span> <span class="ref-title">Statistical tests, P values, confidence intervals, and power: a guide to misinterpretations.</span> <em>European Journal of Epidemiology</em> 31:337–350 (2016).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1007/s10654-016-0149-3" target="_blank" rel="noopener">10.1007/s10654-016-0149-3</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1007/s10654-016-0149-3" target="_blank" rel="noopener">10.1007/s10654-016-0149-3</a></span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Cohen J.</span> <span class="ref-title">Statistical Power Analysis for the Behavioral Sciences, 2nd ed.</span> Routledge (1988).</li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>pwr</code> package · statsmodels <code>stats.power</code></span><span class="ref-meta"><span data-lang="zh"><a href="https://cran.r-project.org/web/packages/pwr/" target="_blank" rel="noopener">CRAN pwr</a></span><span data-lang="en"><a href="https://cran.r-project.org/web/packages/pwr/" target="_blank" rel="noopener">CRAN pwr</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 5: Common Tests ============= -->
+<section class="section section-anchor" id="tests">
+<div class="section-label">Step 5</div>
+<h2>🧪 <span data-zh="常見檢定方法" data-en="Common Tests">常見檢定方法</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Welch BL.</span> <span class="ref-title">The generalization of "Student's" problem when several different population variances are involved.</span> <em>Biometrika</em> 34:28–35 (1947).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/biomet/34.1-2.28" target="_blank" rel="noopener">10.1093/biomet/34.1-2.28</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/biomet/34.1-2.28" target="_blank" rel="noopener">10.1093/biomet/34.1-2.28</a></span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Hollander M, Wolfe DA, Chicken E.</span> <span class="ref-title">Nonparametric Statistical Methods, 3rd ed.</span> Wiley (2014).</li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Agresti A.</span> <span class="ref-title">Categorical Data Analysis, 3rd ed.</span> Wiley (2013).</li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>stats::t.test, wilcox.test, fisher.test, kruskal.test</code> · scipy <code>ttest_ind, mannwhitneyu, chi2_contingency</code></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 6: Linear Regression ============= -->
+<section class="section section-anchor" id="lm">
+<div class="section-label">Step 6</div>
+<h2>📈 <span data-zh="線性迴歸與診斷" data-en="Linear Regression & Diagnostics">線性迴歸與診斷</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Faraway JJ.</span> <span class="ref-title">Linear Models with R, 2nd ed.</span> CRC (2014).</li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Fox J, Weisberg S.</span> <span class="ref-title">An R Companion to Applied Regression, 3rd ed.</span> SAGE (2019). <span class="ref-meta"><span data-lang="zh">內含 <code>car</code> 套件作者</span><span data-lang="en">By the <code>car</code> package authors</span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Belsley DA, Kuh E, Welsch RE.</span> <span class="ref-title">Regression Diagnostics: Identifying Influential Data and Sources of Collinearity.</span> Wiley (1980).</li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>stats::lm, plot.lm</code>; <code>car::vif, influencePlot</code>; <code>sandwich::vcovHC</code>; <code>lmtest::bptest</code></span><span class="ref-meta"><span data-lang="zh">statsmodels <code>ols</code> + <code>get_robustcov_results</code></span><span data-lang="en">statsmodels <code>ols</code> + <code>get_robustcov_results</code></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 7: ANOVA / Mixed Models ============= -->
+<section class="section section-anchor" id="mixed">
+<div class="section-label">Step 7</div>
+<h2>🔀 <span data-zh="ANOVA、ANCOVA、混合效應" data-en="ANOVA, ANCOVA, Mixed Models">ANOVA / 混合效應</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Bates D, Mächler M, Bolker B, Walker S.</span> <span class="ref-title">Fitting linear mixed-effects models using <code>lme4</code>.</span> <em>Journal of Statistical Software</em> 67(1):1–48 (2015).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.18637/jss.v067.i01" target="_blank" rel="noopener">10.18637/jss.v067.i01</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.18637/jss.v067.i01" target="_blank" rel="noopener">10.18637/jss.v067.i01</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Kuznetsova A, Brockhoff PB, Christensen RHB.</span> <span class="ref-title"><code>lmerTest</code> package: tests in linear mixed effects models.</span> <em>JSS</em> 82(13):1–26 (2017).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.18637/jss.v082.i13" target="_blank" rel="noopener">10.18637/jss.v082.i13</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.18637/jss.v082.i13" target="_blank" rel="noopener">10.18637/jss.v082.i13</a></span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Pinheiro JC, Bates DM.</span> <span class="ref-title">Mixed-Effects Models in S and S-PLUS.</span> Springer (2000).</li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Gelman A, Hill J.</span> <span class="ref-title">Data Analysis Using Regression and Multilevel/Hierarchical Models.</span> Cambridge UP (2007).</li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title"><code>emmeans</code> vignettes (Lenth)</span><span class="ref-meta"><span data-lang="zh"><a href="https://cran.r-project.org/web/packages/emmeans/" target="_blank" rel="noopener">CRAN emmeans</a></span><span data-lang="en"><a href="https://cran.r-project.org/web/packages/emmeans/" target="_blank" rel="noopener">CRAN emmeans</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 8: Logistic Regression ============= -->
+<section class="section section-anchor" id="logit">
+<div class="section-label">Step 8</div>
+<h2>🎚️ <span data-zh="Logistic 迴歸與勝算比" data-en="Logistic Regression & Odds Ratios">Logistic 迴歸與 OR</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Hosmer DW, Lemeshow S, Sturdivant RX.</span> <span class="ref-title">Applied Logistic Regression, 3rd ed.</span> Wiley (2013).</li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Firth D.</span> <span class="ref-title">Bias reduction of maximum likelihood estimates.</span> <em>Biometrika</em> 80(1):27–38 (1993).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/biomet/80.1.27" target="_blank" rel="noopener">10.1093/biomet/80.1.27</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/biomet/80.1.27" target="_blank" rel="noopener">10.1093/biomet/80.1.27</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">King G, Zeng L.</span> <span class="ref-title">Logistic regression in rare events data.</span> <em>Political Analysis</em> 9:137–163 (2001).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/oxfordjournals.pan.a004868" target="_blank" rel="noopener">10.1093/oxfordjournals.pan.a004868</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/oxfordjournals.pan.a004868" target="_blank" rel="noopener">10.1093/oxfordjournals.pan.a004868</a></span></span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>glm(family=binomial)</code>; <code>logistf</code>; <code>brglm2</code>; <code>pROC</code></span><span class="ref-meta"><span data-lang="zh">scikit-learn <code>LogisticRegression</code>, <code>calibration_curve</code></span><span data-lang="en">scikit-learn <code>LogisticRegression</code>, <code>calibration_curve</code></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 9: GLM Count Models ============= -->
+<section class="section section-anchor" id="glm">
+<div class="section-label">Step 9</div>
+<h2>🔢 <span data-zh="GLM：Poisson、NB、零膨脹" data-en="GLM — Poisson / NB / Zero-Inflated">GLM 計數模型</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag book">📚</span><span class="ref-author">McCullagh P, Nelder JA.</span> <span class="ref-title">Generalized Linear Models, 2nd ed.</span> CRC (1989).</li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Hilbe JM.</span> <span class="ref-title">Negative Binomial Regression, 2nd ed.</span> Cambridge UP (2011).</li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Robinson MD, McCarthy DJ, Smyth GK.</span> <span class="ref-title"><code>edgeR</code>: a Bioconductor package for differential expression analysis of digital gene expression data.</span> <em>Bioinformatics</em> 26(1):139–140 (2010).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/bioinformatics/btp616" target="_blank" rel="noopener">10.1093/bioinformatics/btp616</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/bioinformatics/btp616" target="_blank" rel="noopener">10.1093/bioinformatics/btp616</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Love MI, Huber W, Anders S.</span> <span class="ref-title">Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2.</span> <em>Genome Biology</em> 15:550 (2014).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1186/s13059-014-0550-8" target="_blank" rel="noopener">10.1186/s13059-014-0550-8</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1186/s13059-014-0550-8" target="_blank" rel="noopener">10.1186/s13059-014-0550-8</a></span></span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>MASS::glm.nb</code>, <code>pscl::zeroinfl</code>, <code>AER::dispersiontest</code></span><span class="ref-meta"><span data-lang="zh">statsmodels <code>GLM</code>, <code>NegativeBinomial</code>, <code>ZeroInflatedNegativeBinomialP</code></span><span data-lang="en">statsmodels <code>GLM</code>, <code>NegativeBinomial</code>, <code>ZeroInflatedNegativeBinomialP</code></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 10: Bayes Basics ============= -->
+<section class="section section-anchor" id="bayes">
+<div class="section-label">Step 10</div>
+<h2>🧠 <span data-zh="貝氏定理、先驗、後驗" data-en="Bayes' Theorem, Priors, Posteriors">貝氏定理 / 先驗 / 後驗</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag book">📚</span><span class="ref-title">Gelman et al., BDA3 Ch. 1–3 · McElreath, <em>Statistical Rethinking</em> 2e Ch. 1–4</span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Berger JO.</span> <span class="ref-title">Statistical Decision Theory and Bayesian Analysis, 2nd ed.</span> Springer (1985).</li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title"><code>rstanarm</code></span><span class="ref-meta"><span data-lang="zh"><a href="https://mc-stan.org/rstanarm/" target="_blank" rel="noopener">mc-stan.org/rstanarm</a> · PyMC <a href="https://www.pymc.io/" target="_blank" rel="noopener">pymc.io</a></span><span data-lang="en"><a href="https://mc-stan.org/rstanarm/" target="_blank" rel="noopener">mc-stan.org/rstanarm</a> · PyMC <a href="https://www.pymc.io/" target="_blank" rel="noopener">pymc.io</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 11: MCMC / HMC ============= -->
+<section class="section section-anchor" id="mcmc">
+<div class="section-label">Step 11</div>
+<h2>⛓️ <span data-zh="MCMC、HMC 與診斷" data-en="MCMC, HMC & Diagnostics">MCMC / HMC / 診斷</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Betancourt M.</span> <span class="ref-title">A conceptual introduction to Hamiltonian Monte Carlo.</span> <em>arXiv preprint</em> 1701.02434 (2017).<span class="ref-meta"><span data-lang="zh"><a href="https://arxiv.org/abs/1701.02434" target="_blank" rel="noopener">arxiv.org/abs/1701.02434</a></span><span data-lang="en"><a href="https://arxiv.org/abs/1701.02434" target="_blank" rel="noopener">arxiv.org/abs/1701.02434</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Carpenter B, Gelman A, Hoffman MD, et al.</span> <span class="ref-title">Stan: A probabilistic programming language.</span> <em>JSS</em> 76(1):1–32 (2017).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.18637/jss.v076.i01" target="_blank" rel="noopener">10.18637/jss.v076.i01</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.18637/jss.v076.i01" target="_blank" rel="noopener">10.18637/jss.v076.i01</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Vehtari A, Gelman A, Simpson D, Carpenter B, Bürkner P-C.</span> <span class="ref-title">Rank-normalization, folding, and localization: An improved R̂ for assessing convergence of MCMC.</span> <em>Bayesian Analysis</em> 16(2):667–718 (2021).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1214/20-BA1221" target="_blank" rel="noopener">10.1214/20-BA1221</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1214/20-BA1221" target="_blank" rel="noopener">10.1214/20-BA1221</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Bürkner P-C.</span> <span class="ref-title"><code>brms</code>: An R package for Bayesian multilevel models using Stan.</span> <em>JSS</em> 80(1):1–28 (2017).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.18637/jss.v080.i01" target="_blank" rel="noopener">10.18637/jss.v080.i01</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.18637/jss.v080.i01" target="_blank" rel="noopener">10.18637/jss.v080.i01</a></span></span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">ArviZ; <code>bayesplot</code></span><span class="ref-meta"><span data-lang="zh"><a href="https://python.arviz.org/" target="_blank" rel="noopener">python.arviz.org</a> · <a href="https://mc-stan.org/bayesplot/" target="_blank" rel="noopener">mc-stan.org/bayesplot</a></span><span data-lang="en"><a href="https://python.arviz.org/" target="_blank" rel="noopener">python.arviz.org</a> · <a href="https://mc-stan.org/bayesplot/" target="_blank" rel="noopener">mc-stan.org/bayesplot</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 12: Posterior / PPC ============= -->
+<section class="section section-anchor" id="postsum">
+<div class="section-label">Step 12</div>
+<h2>📐 <span data-zh="後驗摘要、貝氏因子、PPC" data-en="Posterior Summaries, Bayes Factors, PPC">後驗摘要 / BF / PPC</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Vehtari A, Gelman A, Gabry J.</span> <span class="ref-title">Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC.</span> <em>Statistics and Computing</em> 27:1413–1432 (2017).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1007/s11222-016-9696-4" target="_blank" rel="noopener">10.1007/s11222-016-9696-4</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1007/s11222-016-9696-4" target="_blank" rel="noopener">10.1007/s11222-016-9696-4</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Gabry J, Simpson D, Vehtari A, Betancourt M, Gelman A.</span> <span class="ref-title">Visualization in Bayesian workflow.</span> <em>JRSS A</em> 182(2):389–402 (2019).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1111/rssa.12378" target="_blank" rel="noopener">10.1111/rssa.12378</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1111/rssa.12378" target="_blank" rel="noopener">10.1111/rssa.12378</a></span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Kruschke JK.</span> <span class="ref-title">Doing Bayesian Data Analysis, 2nd ed.</span> Academic Press (2015).</li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>loo</code>, <code>bayestestR</code>, <code>tidybayes</code></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 13: Empirical Bayes ============= -->
+<section class="section section-anchor" id="eb">
+<div class="section-label">Step 13</div>
+<h2>🪢 <span data-zh="階層 / 經驗貝氏 (limma)" data-en="Hierarchical & Empirical Bayes (limma)">階層 / 經驗貝氏</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Smyth GK.</span> <span class="ref-title">Linear models and empirical Bayes methods for assessing differential expression in microarray experiments.</span> <em>Stat Appl Genet Mol Biol</em> 3:Article 3 (2004).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.2202/1544-6115.1027" target="_blank" rel="noopener">10.2202/1544-6115.1027</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.2202/1544-6115.1027" target="_blank" rel="noopener">10.2202/1544-6115.1027</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Ritchie ME, Phipson B, Wu D, Hu Y, Law CW, Shi W, Smyth GK.</span> <span class="ref-title"><code>limma</code> powers differential expression analyses for RNA-sequencing and microarray studies.</span> <em>Nucleic Acids Research</em> 43(7):e47 (2015).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/nar/gkv007" target="_blank" rel="noopener">10.1093/nar/gkv007</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/nar/gkv007" target="_blank" rel="noopener">10.1093/nar/gkv007</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Stephens M.</span> <span class="ref-title">False discovery rates: a new deal.</span> <em>Biostatistics</em> 18(2):275–294 (2017). <strong>(<code>ashr</code>)</strong><span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/biostatistics/kxw041" target="_blank" rel="noopener">10.1093/biostatistics/kxw041</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/biostatistics/kxw041" target="_blank" rel="noopener">10.1093/biostatistics/kxw041</a></span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-title">Efron, <em>Large-Scale Inference</em> (2010) · BDA3 Ch. 5</span></li>
+</ul>
+</section>
+
+<!-- ============= Step 14: FDR ============= -->
+<section class="section section-anchor" id="fdr">
+<div class="section-label">Step 14</div>
+<h2>🚦 <span data-zh="多重檢定與 FDR" data-en="Multiple Testing & FDR">多重檢定與 FDR</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Benjamini Y, Hochberg Y.</span> <span class="ref-title">Controlling the false discovery rate: a practical and powerful approach to multiple testing.</span> <em>JRSS B</em> 57(1):289–300 (1995).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1111/j.2517-6161.1995.tb02031.x" target="_blank" rel="noopener">10.1111/j.2517-6161.1995.tb02031.x</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1111/j.2517-6161.1995.tb02031.x" target="_blank" rel="noopener">10.1111/j.2517-6161.1995.tb02031.x</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Storey JD.</span> <span class="ref-title">A direct approach to false discovery rates.</span> <em>JRSS B</em> 64(3):479–498 (2002).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1111/1467-9868.00346" target="_blank" rel="noopener">10.1111/1467-9868.00346</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1111/1467-9868.00346" target="_blank" rel="noopener">10.1111/1467-9868.00346</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Storey JD, Tibshirani R.</span> <span class="ref-title">Statistical significance for genomewide studies.</span> <em>PNAS</em> 100(16):9440–9445 (2003).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1073/pnas.1530509100" target="_blank" rel="noopener">10.1073/pnas.1530509100</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1073/pnas.1530509100" target="_blank" rel="noopener">10.1073/pnas.1530509100</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Ignatiadis N, Klaus B, Zaugg JB, Huber W.</span> <span class="ref-title">Data-driven hypothesis weighting increases detection power in genome-scale multiple testing.</span> <em>Nature Methods</em> 13:577–580 (2016).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1038/nmeth.3885" target="_blank" rel="noopener">10.1038/nmeth.3885</a> (<strong>IHW</strong>)</span><span data-lang="en">DOI: <a href="https://doi.org/10.1038/nmeth.3885" target="_blank" rel="noopener">10.1038/nmeth.3885</a> (<strong>IHW</strong>)</span></span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>p.adjust</code>, <code>qvalue</code>, <code>IHW</code> (Bioconductor)</span></li>
+</ul>
+</section>
+
+<!-- ============= Step 15: DE Statistics ============= -->
+<section class="section section-anchor" id="de">
+<div class="section-label">Step 15</div>
+<h2>🧬 <span data-zh="DE 統計：limma / edgeR / DESeq2" data-en="DE Statistics — limma / edgeR / DESeq2">DE 統計核心</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Law CW, Chen Y, Shi W, Smyth GK.</span> <span class="ref-title"><code>voom</code>: precision weights unlock linear model analysis tools for RNA-seq read counts.</span> <em>Genome Biology</em> 15:R29 (2014).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1186/gb-2014-15-2-r29" target="_blank" rel="noopener">10.1186/gb-2014-15-2-r29</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1186/gb-2014-15-2-r29" target="_blank" rel="noopener">10.1186/gb-2014-15-2-r29</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">McCarthy DJ, Chen Y, Smyth GK.</span> <span class="ref-title">Differential expression analysis of multifactor RNA-Seq experiments with respect to biological variation.</span> <em>NAR</em> 40(10):4288–4297 (2012). <strong>(<code>edgeR</code> QL)</strong><span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/nar/gks042" target="_blank" rel="noopener">10.1093/nar/gks042</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/nar/gks042" target="_blank" rel="noopener">10.1093/nar/gks042</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Zhu A, Ibrahim JG, Love MI.</span> <span class="ref-title">Heavy-tailed prior distributions for sequence count data: removing the noise and preserving large differences.</span> <em>Bioinformatics</em> 35(12):2084–2092 (2019). <strong>(<code>apeglm</code>)</strong><span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/bioinformatics/bty895" target="_blank" rel="noopener">10.1093/bioinformatics/bty895</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/bioinformatics/bty895" target="_blank" rel="noopener">10.1093/bioinformatics/bty895</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Bourgon R, Gentleman R, Huber W.</span> <span class="ref-title">Independent filtering increases detection power for high-throughput experiments.</span> <em>PNAS</em> 107(21):9546–9551 (2010).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1073/pnas.0914005107" target="_blank" rel="noopener">10.1073/pnas.0914005107</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1073/pnas.0914005107" target="_blank" rel="noopener">10.1073/pnas.0914005107</a></span></span></li>
+  <li><span class="ref-tag bench">BENCH</span><span class="ref-author">Soneson C, Robinson MD.</span> <span class="ref-title">Bias, robustness and scalability in single-cell differential expression analysis.</span> <em>Nature Methods</em> 15:255–261 (2018).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1038/nmeth.4612" target="_blank" rel="noopener">10.1038/nmeth.4612</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1038/nmeth.4612" target="_blank" rel="noopener">10.1038/nmeth.4612</a></span></span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">DESeq2, edgeR, limma vignettes</span><span class="ref-meta"><span data-lang="zh"><a href="https://bioconductor.org/packages/release/bioc/html/DESeq2.html" target="_blank" rel="noopener">DESeq2</a> · <a href="https://bioconductor.org/packages/release/bioc/html/edgeR.html" target="_blank" rel="noopener">edgeR</a> · <a href="https://bioconductor.org/packages/release/bioc/html/limma.html" target="_blank" rel="noopener">limma</a></span><span data-lang="en"><a href="https://bioconductor.org/packages/release/bioc/html/DESeq2.html" target="_blank" rel="noopener">DESeq2</a> · <a href="https://bioconductor.org/packages/release/bioc/html/edgeR.html" target="_blank" rel="noopener">edgeR</a> · <a href="https://bioconductor.org/packages/release/bioc/html/limma.html" target="_blank" rel="noopener">limma</a></span></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 16: Permutation / GSEA ============= -->
+<section class="section section-anchor" id="perm">
+<div class="section-label">Step 16</div>
+<h2>🔄 <span data-zh="排列、Bootstrap、GSEA" data-en="Permutation, Bootstrap, GSEA">排列 / Bootstrap / GSEA</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Subramanian A, Tamayo P, Mootha VK, et al.</span> <span class="ref-title">Gene set enrichment analysis: a knowledge-based approach for interpreting genome-wide expression profiles.</span> <em>PNAS</em> 102(43):15545–15550 (2005).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1073/pnas.0506580102" target="_blank" rel="noopener">10.1073/pnas.0506580102</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1073/pnas.0506580102" target="_blank" rel="noopener">10.1073/pnas.0506580102</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Wu D, Smyth GK.</span> <span class="ref-title"><code>Camera</code>: a competitive gene set test accounting for inter-gene correlation.</span> <em>NAR</em> 40(17):e133 (2012).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/nar/gks461" target="_blank" rel="noopener">10.1093/nar/gks461</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/nar/gks461" target="_blank" rel="noopener">10.1093/nar/gks461</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Korotkevich G, Sukhov V, Budin N, Shpak B, Artyomov MN, Sergushichev A.</span> <span class="ref-title">Fast gene set enrichment analysis.</span> <em>bioRxiv</em> 060012 (2021). <strong>(<code>fgsea</code>)</strong><span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1101/060012" target="_blank" rel="noopener">10.1101/060012</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1101/060012" target="_blank" rel="noopener">10.1101/060012</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Goeman JJ, Bühlmann P.</span> <span class="ref-title">Analyzing gene expression data in terms of gene sets: methodological issues.</span> <em>Bioinformatics</em> 23(8):980–987 (2007).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1093/bioinformatics/btm051" target="_blank" rel="noopener">10.1093/bioinformatics/btm051</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1093/bioinformatics/btm051" target="_blank" rel="noopener">10.1093/bioinformatics/btm051</a></span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-title">Efron & Tibshirani, <em>An Introduction to the Bootstrap</em> (1993)</span></li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>fgsea</code>, <code>clusterProfiler</code>, <code>limma::camera/roast</code> · Python <code>gseapy</code></span></li>
+</ul>
+</section>
+
+<!-- ============= Step 17: Survival Analysis ============= -->
+<section class="section section-anchor" id="surv">
+<div class="section-label">Step 17</div>
+<h2>⏳ <span data-zh="存活分析" data-en="Survival Analysis">存活分析</span></h2>
+<ul class="ref-list">
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Cox DR.</span> <span class="ref-title">Regression models and life-tables.</span> <em>JRSS B</em> 34(2):187–220 (1972).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1111/j.2517-6161.1972.tb00899.x" target="_blank" rel="noopener">10.1111/j.2517-6161.1972.tb00899.x</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1111/j.2517-6161.1972.tb00899.x" target="_blank" rel="noopener">10.1111/j.2517-6161.1972.tb00899.x</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Kaplan EL, Meier P.</span> <span class="ref-title">Nonparametric estimation from incomplete observations.</span> <em>JASA</em> 53(282):457–481 (1958).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1080/01621459.1958.10501452" target="_blank" rel="noopener">10.1080/01621459.1958.10501452</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1080/01621459.1958.10501452" target="_blank" rel="noopener">10.1080/01621459.1958.10501452</a></span></span></li>
+  <li><span class="ref-tag paper">PAPER</span><span class="ref-author">Fine JP, Gray RJ.</span> <span class="ref-title">A proportional hazards model for the subdistribution of a competing risk.</span> <em>JASA</em> 94(446):496–509 (1999).<span class="ref-meta"><span data-lang="zh">DOI: <a href="https://doi.org/10.1080/01621459.1999.10474144" target="_blank" rel="noopener">10.1080/01621459.1999.10474144</a></span><span data-lang="en">DOI: <a href="https://doi.org/10.1080/01621459.1999.10474144" target="_blank" rel="noopener">10.1080/01621459.1999.10474144</a></span></span></li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Therneau TM, Grambsch PM.</span> <span class="ref-title">Modeling Survival Data: Extending the Cox Model.</span> Springer (2000).</li>
+  <li><span class="ref-tag book">📚</span><span class="ref-author">Klein JP, Moeschberger ML.</span> <span class="ref-title">Survival Analysis: Techniques for Censored and Truncated Data, 2nd ed.</span> Springer (2003).</li>
+  <li><span class="ref-tag doc">DOC</span><span class="ref-title">R <code>survival</code>, <code>survminer</code>; Python <code>lifelines</code>, <code>scikit-survival</code></span><span class="ref-meta"><span data-lang="zh"><a href="https://lifelines.readthedocs.io/" target="_blank" rel="noopener">lifelines.readthedocs.io</a></span><span data-lang="en"><a href="https://lifelines.readthedocs.io/" target="_blank" rel="noopener">lifelines.readthedocs.io</a></span></span></li>
+</ul>
+</section>
+
+<style>
+.errata{background:#fef3c7;border-left:4px solid #d97706;border-radius:0 var(--radius-lg) var(--radius-lg) 0;padding:18px 22px;margin:18px 0;font-size:.92rem}
+.errata h4{margin:0 0 8px;color:#92400e;font-family:var(--font-display);font-size:1.05rem}
+.errata p{color:#78350f;margin-bottom:8px;line-height:1.65}
+</style>
+
+<!-- ===================== Errata (consolidated) ===================== -->
+<section class="section section-anchor" id="errata">
+<div class="section-label" data-zh="教學註記" data-en="TUTORIAL NOTES">教學註記</div>
+<h2 data-zh="📌 教學註記與細節" data-en="📌 Tutorial Notes & Details">📌 教學註記與細節</h2>
+<p data-lang="zh">以下整理本頁引用脈絡中容易被忽略、但會直接影響貝氏/頻率推論判讀的補充說明。內容皆為延伸閱讀，所引文獻已收錄於上方各 Step；目的在於把零散注記集中於一處，方便日後查閱。</p>
+<p data-lang="en">Below is a consolidated set of notes that often slip past readers but materially affect how Bayesian/frequentist inference is read. These are extended discussion items — the underlying references already appear in the Step sections above, and gathering them here is meant to make later look-up easier.</p>
+
+<div class="errata">
+<h4>E1 · Welch's t as the New Default (Delacre, Lakens, Leys 2017, IRSP)</h4>
+<p data-lang="zh">傳統教學常先教 Student's t-test (assumes equal variances)，再以 Levene's test 決定是否改用 Welch's t-test。Delacre, Lakens & Leys 2017 (Int Rev Soc Psychol; 10.5334/irsp.82) 透過 Monte Carlo simulation 證明這個流程實際上 inferior — 因為 (1) Levene's test 本身有 type II error，會在實際存在 variance heterogeneity 時失敗；(2) Welch's t-test 在 variances 確實相等時，僅損失少量 power (df 略小)；(3) Welch's t-test 對 unequal n + unequal variance 的組合穩健。結論：應將 Welch's t-test (R: `t.test()` 預設、Python: `scipy.stats.ttest_ind(equal_var=False)`) 作為兩組比較的 *default*，不需先做 Levene/F-test。Ruxton 2006 (Behav Ecol) 為更早的同方向論證。注意：Welch-Satterthwaite df 為非整數，這是正確行為。對 paired design，仍應使用 paired t-test (差值的 one-sample t)。在嚴重 non-normality + small n 下，Wilcoxon signed-rank / Mann-Whitney 或 permutation test 為較佳選擇。</p>
+<p data-lang="en">Traditional teaching first introduces Student's t-test (equal variances) and uses Levene's test to decide whether to switch to Welch's t-test. Delacre, Lakens & Leys 2017 (Int Rev Soc Psychol; 10.5334/irsp.82) showed via Monte Carlo simulation that this workflow is actually inferior because (1) Levene's test itself has type II error and can fail when variance heterogeneity is real; (2) Welch's t-test loses only a small amount of power (slightly smaller df) when variances are equal; (3) Welch's t-test is robust to combinations of unequal n + unequal variance. Conclusion: Welch's t-test (R: `t.test()` default; Python: `scipy.stats.ttest_ind(equal_var=False)`) should be the *default* for two-group comparisons — no preliminary Levene/F-test required. Ruxton 2006 (Behav Ecol) made an earlier version of the same argument. Note: the Welch-Satterthwaite df is non-integer — that is correct behavior. For paired designs, use the paired t-test (one-sample t on differences). Under severe non-normality + small n, Wilcoxon signed-rank / Mann-Whitney or a permutation test is preferable.</p>
+</div>
+
+<div class="errata">
+<h4>E2 · MCMC Convergence ≠ Truth (Vehtari et al. 2021, Bayesian Analysis)</h4>
+<p data-lang="zh">MCMC 診斷 (Gelman-Rubin R̂、effective sample size ESS、trace plot) 的角色是判斷「chain 是否從 stationary distribution 抽樣」— 即 *computational convergence*。但 convergence 不代表後驗分布反映真實 — 模型若 misspecified、prior 若主導、likelihood 若計算錯誤，MCMC 仍可能 converge 到一個錯誤的後驗。Vehtari et al. 2021 (Bayesian Analysis 16(2):667-718) 提出 rank-normalized split-R̂ + folded R̂ 為改良診斷：(1) split chain 為兩半比較 within/between variance；(2) rank-transform 處理重尾或非 Gaussian posterior；(3) folded 版本檢測 scale 而非 location 差異。建議 R̂ &lt; 1.01 (舊閾值 1.1 過於寬鬆) 且 ESS &gt; 400 per parameter (對 quantile 估計，bulk-ESS 與 tail-ESS 應分開檢視)。配套：用 prior predictive check (Gelman 2017) 確認 prior 合理；posterior predictive check (PPC; Gabry 2019, JRSS A) 確認 model 可生成類似觀察資料；leave-one-out cross-validation (LOO; Vehtari 2017, Stats Comput) 比較 model 預測力。實作：ArviZ `az.summary()`、`az.plot_trace()`、`az.loo()`；bayesplot `mcmc_trace()`、`ppc_dens_overlay()`。</p>
+<p data-lang="en">MCMC diagnostics (Gelman-Rubin R̂, effective sample size ESS, trace plot) tell you whether the chain is sampling from the stationary distribution — i.e., *computational convergence*. Convergence does not imply the posterior reflects reality — if the model is misspecified, the prior dominates, or the likelihood is coded wrong, MCMC can still converge to an incorrect posterior. Vehtari et al. 2021 (Bayesian Analysis 16(2):667-718) propose rank-normalized split-R̂ + folded R̂ as improved diagnostics: (1) split each chain in half and compare within/between variance; (2) rank-transform to handle heavy-tailed or non-Gaussian posteriors; (3) the folded version detects scale rather than location differences. Recommend R̂ &lt; 1.01 (the old 1.1 threshold is too lax) and ESS &gt; 400 per parameter (for quantile estimation, examine bulk-ESS and tail-ESS separately). Complement with: prior predictive checks (Gelman 2017) to validate the prior, posterior predictive checks (PPC; Gabry 2019, JRSS A) to confirm the model can generate data similar to observed, and leave-one-out cross-validation (LOO; Vehtari 2017, Stats Comput) to compare predictive power. Implementation: ArviZ `az.summary()`, `az.plot_trace()`, `az.loo()`; bayesplot `mcmc_trace()`, `ppc_dens_overlay()`.</p>
+</div>
+
+<div class="errata">
+<h4>E3 · BIC vs AIC — Asymptotic Limits</h4>
+<p data-lang="zh">AIC = −2·log L + 2k；BIC = −2·log L + k·log(n)。雖然兩者形式相似，背後 asymptotic justification 完全不同：AIC (Akaike 1973) 為估計 *out-of-sample predictive accuracy* (Kullback-Leibler divergence)，假設 "true model" *不在* candidate set 中 — AIC 選最接近真實的 approximation。BIC (Schwarz 1978) 為估計 *posterior model probability*，假設 "true model" *在* candidate set 中 — BIC 在 n → ∞ 時 consistent (選到真實 model 機率 → 1)，但代價是在中等 n 時 *under-fit* (penalty 過重)。實用上：(1) 預測為目的 → AIC 或 LOO-CV (Vehtari 2017)；(2) 變數選擇 + 真實 model 假設 → BIC；(3) hierarchical/random effects 模型 → DIC 已被淘汰，改用 WAIC 或 PSIS-LOO；(4) 雙者不可直接比較數值 — AIC 與 BIC 不在同一尺度。Burnham & Anderson 2002 為頻率主義模型平均的標準參考。對 Bayesian 模型，建議 LOO-CV (Vehtari 2017, Stats Comput 27:1413) + ELPD 為主要工具，因其考慮整個 posterior 而非單一 point estimate。Stan/PyMC + ArviZ 的 `az.compare()` 提供標準輸出。</p>
+<p data-lang="en">AIC = −2·log L + 2k; BIC = −2·log L + k·log(n). The forms look similar, but the asymptotic justifications differ completely: AIC (Akaike 1973) estimates *out-of-sample predictive accuracy* (Kullback-Leibler divergence) under the assumption that the "true model" is *not* in the candidate set — AIC selects the best approximation. BIC (Schwarz 1978) estimates *posterior model probability* under the assumption that the "true model" *is* in the candidate set — BIC is consistent as n → ∞ (probability of selecting the true model → 1), but the cost is *under-fitting* at moderate n (heavy penalty). Practical guidance: (1) prediction → AIC or LOO-CV (Vehtari 2017); (2) variable selection assuming the true model is in the set → BIC; (3) hierarchical / random-effects models → DIC is deprecated, use WAIC or PSIS-LOO; (4) AIC and BIC values cannot be directly compared — they are not on the same scale. Burnham & Anderson 2002 is the standard reference for frequentist multi-model inference. For Bayesian models, prefer LOO-CV (Vehtari 2017, Stats Comput 27:1413) + ELPD as the primary tool because it uses the full posterior rather than a point estimate. Stan/PyMC + ArviZ `az.compare()` provides standardized output.</p>
+</div>
+
+<div class="errata">
+<h4>E4 · Stan vs PyMC — NUTS / brms / JAX Backends</h4>
+<p data-lang="zh">兩大主流 probabilistic programming 平台各有定位：(1) Stan (Carpenter et al. 2017, JSS 76(1):1-32) 以 C++ 實作 NUTS (No-U-Turn Sampler, Hoffman & Gelman 2014) 的 HMC，提供 R 介面 (rstan、rstanarm、brms — Bürkner 2017 JSS 80(1):1-28) 與 Python (PyStan、cmdstanpy)。優勢：成熟 (2012-)、社群活躍、warning system 完整 (divergent transitions、E-BFMI)。劣勢：模型需編譯 (cold start ~30s)。(2) PyMC (v5+; Salvatier 2016, PeerJ CS) 以 Python + PyTensor，後端可切換 (default Numba, JAX via `pymc-jax`)。優勢：(a) JAX backend 提供 GPU/TPU 加速；(b) variational inference (ADVI、Pathfinder) 與 SMC sampler 內建；(c) 與 deep learning ecosystem (Flax、Haiku) 整合。NumPyro (Phan 2019) 為 Uber 開發的 JAX-native PPL，速度更快但 API 較底層。BlackJAX 為 JAX-based 採樣器函式庫。選擇建議：(i) hierarchical model with random slopes → brms (Stan)，syntax 最接近 lme4；(ii) deep generative model / amortized inference → NumPyro/Pyro；(iii) 大型 dataset + GPU → PyMC + JAX 或 NumPyro。所有平台都支援 ArviZ 為共用 diagnostics 介面 (Kumar 2019)。</p>
+<p data-lang="en">The two mainstream probabilistic programming platforms have different niches: (1) Stan (Carpenter et al. 2017, JSS 76(1):1-32) implements NUTS (No-U-Turn Sampler, Hoffman & Gelman 2014) HMC in C++, with R interfaces (rstan, rstanarm, brms — Bürkner 2017 JSS 80(1):1-28) and Python (PyStan, cmdstanpy). Pros: mature (since 2012), active community, comprehensive warning system (divergent transitions, E-BFMI). Cons: models must be compiled (cold start ~30s). (2) PyMC (v5+; Salvatier 2016, PeerJ CS) uses Python + PyTensor with switchable backends (Numba by default, JAX via `pymc-jax`). Pros: (a) JAX backend gives GPU/TPU acceleration; (b) variational inference (ADVI, Pathfinder) and SMC sampler built in; (c) integrates with deep-learning ecosystems (Flax, Haiku). NumPyro (Phan 2019, Uber) is a JAX-native PPL — faster but lower-level API. BlackJAX is a JAX-based sampler library. Choosing: (i) hierarchical model with random slopes → brms (Stan), syntax closest to lme4; (ii) deep generative model / amortized inference → NumPyro/Pyro; (iii) large dataset + GPU → PyMC + JAX or NumPyro. All platforms support ArviZ as a common diagnostics interface (Kumar 2019).</p>
+</div>
+
+<div class="errata">
+<h4>E5 · p-value vs Posterior — Jeffreys-Lindley Paradox</h4>
+<p data-lang="zh">在大樣本下，frequentist test 與 Bayesian model comparison 可給出截然相反的結論 — 即 Jeffreys-Lindley paradox (Lindley 1957, Biometrika)。經典例子：H₀: μ = 0 vs H₁: μ ≠ 0，n = 10⁶，sample mean = 0.001 (z = 2.0, p = 0.046 → reject H₀)；但若 prior on μ under H₁ 為 N(0, 1)，Bayes factor BF₁₀ ≈ 0.05 → strong evidence *for* H₀。原因：p-value 隨 n 增加而對任何 ε ≠ 0 的偏離都敏感；Bayes factor 則 penalize "預測力分散到大區間" 的 alternative，即 Occam's razor。實作建議：(1) 大樣本 + 點 null 場景，p-value 容易誤導 — 改用 region of practical equivalence (ROPE; Kruschke 2018) 或 minimum effect size of interest (SESOI)。(2) 報告 effect size + 95% CI/CrI 比單一 p-value/BF 更 informative。(3) Bayes factor 對 prior on alternative *敏感* (e.g., Cauchy(0, r=√2/2) 為 BayesFactor 套件 default; Rouder 2009)，需 sensitivity analysis。(4) ASA 2016/2019 與 Greenland 2016 (Eur J Epidemiol) 為 p-value 誤解的標準參考。Berger & Sellke 1987 (JASA) 量化 p ≈ 0.05 對應的 minimum BF₁₀ ≈ 2.5，遠小於 Jeffreys "substantial" 的 3。</p>
+<p data-lang="en">At large sample sizes, a frequentist test and a Bayesian model comparison can give opposite conclusions — the Jeffreys-Lindley paradox (Lindley 1957, Biometrika). Classic example: H₀: μ = 0 vs H₁: μ ≠ 0, n = 10⁶, sample mean = 0.001 (z = 2.0, p = 0.046 → reject H₀); but with prior μ ~ N(0, 1) under H₁, the Bayes factor BF₁₀ ≈ 0.05 → strong evidence *for* H₀. Reason: the p-value becomes sensitive to any ε ≠ 0 deviation as n grows, while the Bayes factor penalizes alternatives that "spread predictive mass over a wide region" — Occam's razor. Recommendations: (1) under large-n + point-null settings, p-values are easy to misread — use a region of practical equivalence (ROPE; Kruschke 2018) or a minimum effect size of interest (SESOI). (2) Reporting effect size + 95% CI/CrI is more informative than a single p-value or BF. (3) Bayes factors are *sensitive* to the prior on the alternative (e.g., Cauchy(0, r=√2/2), the BayesFactor-package default, Rouder 2009) — perform sensitivity analysis. (4) ASA 2016/2019 and Greenland 2016 (Eur J Epidemiol) are the canonical references on p-value misinterpretations. Berger & Sellke 1987 (JASA) quantified that p ≈ 0.05 corresponds to a minimum BF₁₀ ≈ 2.5, far below Jeffreys' "substantial" threshold of 3.</p>
+</div>
+
+<div class="errata">
+<h4>E6 · Prior Choice Sensitivity (Gabry et al. 2019, JRSS A)</h4>
+<p data-lang="zh">「Bayesian 結果依賴 prior」是頻率主義常見批評。實情更精確：(1) 在 well-identified、large-sample 場景，posterior 由 likelihood 主導，prior 影響輕微；(2) 在 small n、稀疏 data、複雜階層模型中，prior 可能顯著影響 posterior — 此時必須做 prior sensitivity analysis。Gabry et al. 2019 (JRSS A 182(2):389-402) 與 Schad et al. 2021 (Psychol Methods) 提出 Bayesian workflow：(i) prior predictive check (在看到資料前模擬 prior implied data，確認合理範圍)；(ii) fit model；(iii) MCMC diagnostics (E2)；(iv) posterior predictive check (PPC; 模擬與觀察比較)；(v) leave-one-out (LOO; Vehtari 2017) 評估預測力；(vi) prior sensitivity (重新跑 weakly informative vs informative prior 比較)。預設 prior：(a) 對 fixed effects 用 weakly informative (Normal(0, 2.5·SD(x)) for slope; Gelman 2008 Ann Appl Stat)；(b) 對 variance components 避免 inv-gamma(ε, ε)，改用 half-normal/half-cauchy/half-t (Gelman 2006 Bayesian Anal)；(c) brms 預設 prior 為 student-t(3, ...)，比 N(0, 100) 的 "vague" 更穩定。Stan Wiki "Prior Choice Recommendations" 為實用 cheat sheet。</p>
+<p data-lang="en">"Bayesian results depend on the prior" is a frequent frequentist critique. More precisely: (1) in well-identified large-sample settings, the posterior is dominated by the likelihood and the prior matters little; (2) at small n, sparse data, or complex hierarchical models, the prior can substantially affect the posterior — prior sensitivity analysis is then required. Gabry et al. 2019 (JRSS A 182(2):389-402) and Schad et al. 2021 (Psychol Methods) propose a Bayesian workflow: (i) prior predictive check (simulate prior-implied data before seeing the actual data, verify the range is plausible); (ii) fit the model; (iii) MCMC diagnostics (E2); (iv) posterior predictive check (PPC; compare simulated vs observed); (v) leave-one-out (LOO; Vehtari 2017) to assess predictive performance; (vi) prior sensitivity (re-run with weakly-informative vs informative priors and compare). Default priors: (a) for fixed effects, weakly informative (Normal(0, 2.5·SD(x)) for slopes; Gelman 2008 Ann Appl Stat); (b) for variance components, avoid inv-gamma(ε, ε) — prefer half-normal / half-Cauchy / half-t (Gelman 2006 Bayesian Anal); (c) brms defaults to student-t(3, ...), which is more stable than the "vague" N(0, 100). The Stan Wiki "Prior Choice Recommendations" is a practical cheat sheet.</p>
+</div>
+
+<div class="errata">
+<h4>E7 · FDR vs FWER — Conceptual Distinction</h4>
+<p data-lang="zh">兩者控制的錯誤類型不同：(1) FWER (family-wise error rate) = P(至少一個 false positive) ≤ α — 適用於「任何一個錯誤都嚴重」的情境 (clinical trial 多重 endpoints、藥物批准)。方法：Bonferroni、Holm 1979、Hochberg 1988、單步/逐步 Šidák。(2) FDR (false discovery rate) = E[V/R | R&gt;0]·P(R&gt;0) ≤ q — 「在被宣告為 significant 的結果中，預期 false positive 比例」。適用於 large-scale screening (transcriptomics、GWAS、proteomics)。方法：Benjamini-Hochberg 1995、Storey 2002 q-value、Ignatiadis 2016 IHW (data-driven hypothesis weighting)。FDR 比 FWER *寬鬆* — m = 10000 時，BH 在 q=0.05 下可保留 ~500 真實 discovery 中的 25 false positive；Bonferroni 在 α=0.05/10000 下幾乎無 power。注意：(a) FDR 不對單一 hypothesis 給 error guarantee — 只對 *整批* 結果；(b) BH 假設 p-value 在 H₀ 下 uniform 且 PRDS (positive regression dependent on subset; Benjamini-Yekutieli 2001) — 對 negatively correlated tests 應用 BY；(c) 對 discrete tests (Fisher exact)，BH 過於保守，可改用 group-FDR 或 adjusted-BH。Local FDR (Efron 2010 Large-Scale Inference) 為單一 test 的後驗 FDR，與 Bayesian framework 對接。在 RNA-seq 中，IHW 與 apeglm (Zhu 2018) 同時使用可顯著提高 power。</p>
+<p data-lang="en">FDR and FWER control different errors: (1) FWER (family-wise error rate) = P(at least one false positive) ≤ α — appropriate when "any single error is serious" (multi-endpoint clinical trials, drug approval). Methods: Bonferroni, Holm 1979, Hochberg 1988, single-step / step-down Šidák. (2) FDR (false discovery rate) = E[V/R | R&gt;0]·P(R&gt;0) ≤ q — "expected proportion of false positives among declared significants". Appropriate for large-scale screening (transcriptomics, GWAS, proteomics). Methods: Benjamini-Hochberg 1995, Storey 2002 q-value, Ignatiadis 2016 IHW (data-driven hypothesis weighting). FDR is *more permissive* than FWER — at m = 10000 and q = 0.05, BH can retain ~25 false positives among ~500 true discoveries; Bonferroni at α = 0.05/10000 has essentially no power. Notes: (a) FDR makes no guarantee about a single hypothesis — only about the *batch* of results; (b) BH assumes p-values are uniform under H₀ and PRDS (positive regression dependence on subset; Benjamini-Yekutieli 2001) — use BY for negatively correlated tests; (c) for discrete tests (Fisher exact), BH is over-conservative — use group-FDR or adjusted-BH. Local FDR (Efron 2010 Large-Scale Inference) is the posterior FDR for a single test and connects to the Bayesian framework. In RNA-seq, using IHW together with apeglm (Zhu 2018) significantly increases power.</p>
+</div>
+
+<div class="errata">
+<h4>E8 · James-Stein / Shrinkage — limma / ashr / DESeq2 Connection</h4>
+<p data-lang="zh">James-Stein 1961 (Berkeley Symp) 是 20 世紀統計學最反直覺的結果之一：當同時估計 *三個或更多 ≥ 3* 獨立常態 means 時，shrinkage estimator (向總平均收縮一個比例) 的 *total MSE* 嚴格優於 maximum likelihood (independent sample means)，無論真實 means 為何。其精神為「借力」(borrow strength) — 即使 means 之間 *沒有* 直接關係，pooled information 也能改善整體估計。現代基因體統計大量應用此精神：(1) limma (Smyth 2004; Ritchie 2015) 用 empirical Bayes 收縮每個 gene 的 variance 估計，向 global variance prior 收縮 — 解決 microarray/RNA-seq 中 per-gene n 過小的問題；moderated t 比 ordinary t 顯著更穩健。(2) DESeq2 (Love 2014, Genome Biol) 收縮 dispersion 估計向 mean-dispersion trend；apeglm (Zhu 2018, Bioinformatics) 用 heavy-tailed (Cauchy-like) prior 收縮 log2 fold change，避免 low-count gene 的 noise 主導 ranking。(3) edgeR (Robinson 2010) 透過 weighted likelihood 結合 common dispersion 與 tagwise dispersion。(4) ashr (Stephens 2017, Biostatistics 18(2):275) 將 FDR 框架本身改寫為 adaptive shrinkage — local FDR + effect size 一併估計，使用 unimodal prior 假設提供 LFSR (local false sign rate) 取代 q-value。(5) Bayesian hierarchical model 為更通用的 shrinkage 框架 — group-level random effects 即自動實現 borrow-strength。Efron 2010 (Large-Scale Inference) 為此議題的完整 textbook。實作要點：在小樣本、多 hypothesis、高 variance 場景，always prefer shrinkage estimators over per-test MLE。</p>
+<p data-lang="en">James-Stein 1961 (Berkeley Symp) is one of the most counter-intuitive results in 20th-century statistics: when estimating *three or more (≥ 3)* independent normal means simultaneously, a shrinkage estimator (shrinking each sample mean toward the overall mean by a fraction) strictly dominates the MLE (independent sample means) in *total MSE*, regardless of the true means. The intuition is "borrowing strength" — even when the means have *no* direct relationship, pooled information still improves overall estimation. Modern genomic statistics applies this idea extensively: (1) limma (Smyth 2004; Ritchie 2015) uses empirical Bayes to shrink each gene's variance estimate toward a global variance prior, solving the per-gene-small-n problem in microarray/RNA-seq; moderated t is significantly more robust than ordinary t. (2) DESeq2 (Love 2014, Genome Biol) shrinks dispersion estimates toward a mean-dispersion trend; apeglm (Zhu 2018, Bioinformatics) uses a heavy-tailed (Cauchy-like) prior to shrink log2 fold changes, preventing low-count genes from dominating rankings by noise. (3) edgeR (Robinson 2010) combines common and tagwise dispersion through a weighted likelihood. (4) ashr (Stephens 2017, Biostatistics 18(2):275) reformulates the FDR framework itself as adaptive shrinkage — jointly estimating local FDR and effect size under a unimodal-prior assumption and giving LFSR (local false sign rate) in place of the q-value. (5) Bayesian hierarchical models are a more general shrinkage framework — group-level random effects implement borrow-strength automatically. Efron 2010 (Large-Scale Inference) is the complete textbook on this topic. Practice: in small-n, many-hypothesis, high-variance settings, always prefer shrinkage estimators over per-test MLE.</p>
+</div>
+
+</section>
+
+<nav class="page-nav">
+<a href="../index.html"><span class="nav-dir" data-zh="← 返回" data-en="← Back">← 返回</span><span class="nav-title" data-zh="教程首頁" data-en="Tutorial Hub">教程首頁</span></a>
+<a href="../stat-inference-quiz/index.html" style="text-align:right" target="_blank" rel="noopener"><span class="nav-dir" data-zh="互動考題 →" data-en="Quiz →">互動考題 →</span><span class="nav-title" data-zh="互動式考題" data-en="Interactive Quiz">互動式考題</span></a>
+</nav>
+
+
+<!-- ===================== Footnote ===================== -->
+<section class="section">
+<div class="callout tip">
+<span class="callout-icon">📖</span>
+<div>
+<strong data-zh="查找指南：" data-en="How to find a paper:">查找指南：</strong>
+<span data-zh="所有 DOI 連結指向出版社頁面。若需下載 PDF，可搭配 " data-en="DOI links point to publisher pages. For free PDFs, try ">所有 DOI 連結指向出版社頁面。若需下載 PDF，可搭配 </span>
+<a href="https://pubmed.ncbi.nlm.nih.gov/" target="_blank" rel="noopener">PubMed</a>、
+<a href="https://www.ncbi.nlm.nih.gov/pmc/" target="_blank" rel="noopener">PMC</a>、
+<a href="https://arxiv.org/" target="_blank" rel="noopener">arXiv</a>、
+<a href="https://www.biorxiv.org/" target="_blank" rel="noopener">bioRxiv</a>
+<span data-zh=" 找開放近用版本。" data-en=" for open-access versions."> 找開放近用版本。</span>
+</div>
+</div>
+</section>
+
+</main>
+
+<footer class="site-footer">© Charlene — Statistical Inference Interactive Tutorial · References</footer>
+<script src="../i18n.js"></script>
+</body>
+</html>
+                                   
